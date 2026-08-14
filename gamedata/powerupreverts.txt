@@ -1,0 +1,151 @@
+"Games"
+{
+	"tf"
+	{
+		"Signatures"
+		{
+			// "RuneRegenThink", should also contain "RegenThink", shouldn't contain event strings such as "player_healonhit"
+			"CTFPlayer::StateEnterACTIVE"
+			{
+				"library"   "server"
+				"linux"     "@_ZN9CTFPlayer16StateEnterACTIVEEv"
+				"windows"   "\x53\x56\x57\x6A\x00\x6A\x02\x8B\xF1"
+			}
+			// "models/props_trainyard/bomb_eotl_", not the precache function
+			"CTFGameRules::SetupOnRoundStart"
+			{
+				"library"   "server"
+				"linux"     "@_ZN12CTFGameRules17SetupOnRoundStartEv"
+				"windows"   "\x55\x8B\xEC\x83\xEC\x48\x53\x56\x8B\xD9"
+			}
+			// "player_domination"
+			"CTFGameRules::CalcDominationAndRevenge"
+			{
+				"library"	"server"
+				"linux"		"@_ZN12CTFGameRules24CalcDominationAndRevengeEP9CTFPlayerP11CBaseEntityS1_bPi"
+				"windows"	"\x55\x8B\xEC\x51\x56\x8B\xF1\x8B\x06\x8B\x80\x2A\x2A\x2A\x2A\xFF\xD0\x84\xC0\x0F\x85\x2A\x2A\x2A\x2A\x38\x86"
+			}
+			// "BumperCar.Jump", not the precache function
+			"CTFGameMovement::CheckJumpButton"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15CTFGameMovement15CheckJumpButtonEv"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x0C\x53\x56\x57\x8B\xF9\x8B\x4F\x04\x80\xB9\x84\x0B\x00\x00\x00"
+			}
+		}
+
+		"Offsets"
+		{
+			"CTFWeaponBaseMelee::DoMeleeDamage"
+			{
+				"linux"		"483"
+				"windows"	"475"
+			}
+			"CTFSniperRifle::GetProjectileDamage"
+			{
+				"linux"		"495"
+				"windows"	"488"
+			}
+		}
+
+		"MemPatches"
+		{
+			// Heavy no longer gets the jump-up boost when grappling (Oct 1, 2020).
+			// Flip the class-compare immediate on both platforms so it never matches Heavy;
+			// the branch then always resolves into the grapple jump-up boost path.
+			"CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost"
+			{
+				"signature"		"CTFGameMovement::CheckJumpButton"
+				"linux"
+				{
+					"offset"	"92"
+					"verify"	"\x83\xBF\xD8\x22\x00\x00\x06" // cmp dword [edi+0x22D8], 0x6
+					"patch"		"\x83\xBF\xD8\x22\x00\x00\xFF" // cmp dword [edi+0x22D8], 0xFF (never == Heavy)
+				}
+				"windows"
+				{
+					"offset"	"213"
+					"verify"	"\x83\xBE\xD0\x22\x00\x00\x06" // cmp dword [esi+0x22D0], 0x6
+					"patch"		"\x83\xBE\xD0\x22\x00\x00\xFF" // cmp dword [esi+0x22D0], 0xFF (never == Heavy)
+				}
+			}
+		}
+
+		"Functions"
+		{
+			"CTFWeaponBaseMelee::DoMeleeDamage"
+			{
+				"offset"	"CTFWeaponBaseMelee::DoMeleeDamage"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"ent"
+					{
+						"type"	"cbaseentity"
+					}
+					"trace"
+					{
+						"type"	"int"
+					}
+					"flDamageMod"
+					{
+						"type"	"float"
+					}
+				}
+			}
+			"CTFSniperRifle::GetProjectileDamage"
+			{
+				"offset"	"CTFSniperRifle::GetProjectileDamage"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"float"
+			}
+			"CTFPlayer::StateEnterACTIVE"
+			{
+				"signature" "CTFPlayer::StateEnterACTIVE"
+				"callconv"  "thiscall"
+				"this"      "entity"
+				"return"    "void"
+			}
+			"CTFGameRules::SetupOnRoundStart"
+			{
+				"signature"	"CTFGameRules::SetupOnRoundStart"
+				"callconv"	"thiscall"
+				"this"		"address"
+				"return"	"void"
+			}
+			"CTFGameRules::CalcDominationAndRevenge"
+			{
+				"signature"	"CTFGameRules::CalcDominationAndRevenge"
+				"callconv"	"thiscall"
+				"this"		"address"
+				"return"	"void"
+				"arguments"
+				{
+					"pAttacker"
+					{
+						"type"	"cbaseentity"
+					}
+					"pWeapon"
+					{
+						"type"	"cbaseentity"
+					}
+					"pVictim"
+					{
+						"type"	"cbaseentity"
+					}
+					"bIsAssist"
+					{
+						"type"	"bool"
+					}
+					"piDeathFlags"
+					{
+						"type"	"int"
+					}
+				}
+			}
+		}
+	}
+}

@@ -1,0 +1,177 @@
+where IsPowerupMode is called (server/shared):
+
+temp rune spawn (implemented)
+capture zone
+buildings
+- increased damage taken from strength, revenge, knockout (implemented?)
+- vampire leech (implemented?)
+sapper vampire leech
+player
+- uber on spawn (implemented)
+- dropping powerup on disconnect (implemented?)
+- rune regen think (implemented)
+capture flag (elaborate)
+- flag glow
+- standoff
+- flag marked poisonous
+- custom capture sound
+- mark for death on poisonous flag
+gamerules (elaborate)
+- round start rune spawn (implemented)
+- basic functionality (?)
+- no dominations and revenge (not working)
+- prevent imbalance team swap (implemented)
+- CanFlagBeCaptured
+- poisonous flag
+- CalcPlayerScore
+player shared
+- burn damage vampire leech
+weapons
+- knife
+ - kunai delta health (?)
+- sniperrifle
+ - precision damage bonus (implemented)
+- weaponbase
+ - no random crits (implemented?)
+- weaponbase melee
+ - damage increase (implemented)
+
+things we dont want (wont be applied if IsPowerupMode false):
+ammo pack charge gain
+buildings (elaborate)
+- 1 sec total construction time
+- Level3 skips Level2 anim when redeployed
+- double upgrade rate
+player
+- dominant state
+- deny team swapping
+- rage build reductions
+gamerules
+- no airborne (mini)crit bonuses
+- minicrits cancel +30% bonus
+- scout no fall damage (use pbpp instead)
+- precision radius damage falloff
+player shared
+- demo charge recharge reduction
+weapons
+- knife
+ - backstab victim health
+ - no backstabbing grappled
+- medigun
+ - heal and uber rate nerf
+- weaponbase
+ - knife deploy nerf
+ - ubersaw nerf
+
+removed features to re-implement:
+heavy grapple jump (implemented)
+medic free ride (?)
+medic overheal on powerup
+
+tf2 patch notes
+ * May 11, 2016 Patch
+
+    Players can no longer change teams in Mannpower Mode. (The big one)
+
+ * August 2, 2017 Patch 1
+
+    All-class
+        Players can no longer taunt when grappled to an enemy. (you can still taunt if an enemy has grappled to you)
+        Players can no longer grapple while frozen before a round starts or while stunned.
+        Fixed not equipping the grapple when accepting the prompt about equipping it.
+    Engineer
+        Halved the number of Wrench hits needed to upgrade buildings.
+    Pyro
+        Reduced grapple movement speed when hooked into another player because of their advantage in close quarters.
+        Reduced the rate of rage gain when carrying a powerup.
+    Agility
+        Reduced grapple movement speed bonus when carrying the intelligence.
+    Knockout
+        Reduced melee damage bonus.
+        Updated health bonus per class:
+            Spy, Sniper, Engineer, Scout, and Heavy increased.
+            Medic, Soldier, and Demoman unchanged.
+            Pyro and Demoknight decreased.
+    Precision
+        Removed radius damage falloff on explosive projectiles.
+        Removed self-blast damage.
+    Resistance and Vampire
+        Added immunity to reflect damage.
+
+ * October 20, 2017 Patch 1 (Jungle Inferno Update)
+
+    Knockout powerup now collects health pack health without subtracting their health bonus. Results in Knockout carriers collecting more health from each health kit.
+    Resistance powerup now blocks backstabs.
+ 
+ * October 1, 2020 Patch (Scream Fortress XII)
+
+    Gameplay Changes
+        Flag carrier grapple movement speed reduced
+            Scout with no powerup or with Agility powerup – reduced to 0.8x regular grapple movement speed (down from regular grapple movement speed in previous version)
+            Scout with any other powerup - 0.65x normal grapple movement speed (no change from previous version)
+            Any other class without a powerup or with Agility powerup - reduced to 0.65x normal grapple movement speed (down from 0.8x in previous version)
+            Any other class with a powerup - reduced to 0.5x normal grapple movement speed (down from 0.65x in previous version)
+        Critical hit damage rules changed
+            Weapons that score Critical hit boosts on airborne targets will no longer do so in Mannpower since being airborne is a far more important and commonly utilized movement style than in the base game
+            Melee weapons that score Mini-Crit damage no longer have their base Mannpower 1.3x damage boost
+        Medic
+            Free ride removed. Previously when healing a target, you’d be pulled along with them when they moved by grappling hook.
+            Reduced heal rate and ubercharge build rate when carrying a powerup or healing someone with a powerup
+                Medics carrying Haste or Agility are exempt from Medic powerup checks
+                If Medic has no powerup and target has no powerup – regular heal and uber build rate
+                If only one of the Medic and the target has a powerup - half heal and uber build rate
+                If both Medic and target have powerups - quarter heal and uber build rate
+            Removed overheal from targets carrying powerups
+        Heavy
+            Removed the jump up boost when grappling. You can still jump to disconnect the hook, but the Heavy no longer gets the height boost when doing so.
+        Soldier
+            Battalion’s Backup rage build rate reduced by 2.5x to counter the additional benefits of an extra 20hp and Critical hit immunity when compared to the Buff Banner
+        Engineer
+            Carried buildings will now deploy instantly
+        Scout
+            Removed falling damage
+        Spy
+            Backstabs disallowed if you’re connected to an enemy by the grappling hook. This applies if you’re hooked into someone or if they’re hooked into you.
+            Knife deploy time is no longer instant when switching between weapons, even when carrying Agility
+            Conniver's Kunai no longer considers the victim’s powerup boosted health when taking damage dealt as health
+        Haste buffs
+            Reload speed increased from 2x normal to 4x normal
+            Pyro Flare Gun re-fire rate increased from 2x normal to 5x normal
+        Vampire changes
+            Fixed a bug where the Vampire carrier wouldn’t receive health from damage dealt by an explosion that also caused self-damage
+            Increased blast weapon clip size 1.5x
+        Resistance changes
+            Vampire no longer gets a 25% boost to their health received on melee attacks against a player carrying resistance
+        Fixed bug where grapple would auto disconnect after a couple of seconds if the hook embedded in geometry behind clip volumes
+    Game Balance Changes
+        When the game detects a skill imbalance between teams, select players will be moved between teams to address the imbalance
+        If a player is dominating the game for long enough (kills count is very high relative to the rest of the players in the game), they’ll enter a dominant state for a period of time. This state has these effects:
+            Marked For Death
+            Powerup modifications
+                Reflect – maximum health reduced 400 to 320. Reflect damage reduced from 80% to 50%
+                Vampire – damage resistance removed. No blast weapon clip size increase
+                Strength – game multiplier reduced from 2x to 1.4x
+                Regeneration – health regenerates at 70% of the regular rate
+                Haste – weapon firing rate increase reduced from 2x to 1.5x.Weapon reload speed increase reduced from 4x to 2x
+                Knockout – melee damage increase reduced from 1.9x to 1.4x
+                King – max health increase reduced from 100 to 20
+                Plague – damage resistance to infected players reduced from 50% to 20%
+                Precision
+                    Sniper Rifle - Scope speed increase reduced from 2x from 1.5x. Shot charge speed increase reduced from 3x to 2x. Damage bonus reduced from 2x to 1.5x
+                    Blast weapons - Regular blast radius falloff. No clip size increase
+                Resistance – damage resistance reduced from 50% to 35%
+            Server variables associated with this feature:
+                tf_powerup_mode_dominant_multiplier – the multiple over the server median that a player’s kill count needs to be in order to be determined dominant
+                tf_powerup_mode_killcount_timer_length – the time interval to wait between tests for dominant players
+
+November 5, 2020 Patch
+
+    Dominant players are now marked for death only when carrying a powerup
+    Shield charge meter passive refill rate reduced. Reduction is greater when carrying a powerup
+    Items or actions that add to the shield charge meter now add less when carrying a powerup
+    Carried buildings now deploy faster than default, but not instant
+    Decapitating swords no longer get the base melee damage boost other melee weapons get in Mannpower
+    Strength powerup no longer multiplies critical damage
+    Medic
+        Powered up medics with unpowered up targets get a less reduced heal rate (50% -> 75% of default rate)
+        Reduced ubercharge gain on Übersaw hit in Mannpower. 40% of regular rate if not powered up, 20% of regular rate if powered up

@@ -1,0 +1,15 @@
+*
+!.gitignore
+!README.md
+!mannpower-todo
+
+!scripting/
+scripting/*
+!scripting/powerupreverts.sp
+
+#includes
+scripting/include/
+
+!gamedata/
+gamedata/*
+!gamedata/powerupreverts.txt
