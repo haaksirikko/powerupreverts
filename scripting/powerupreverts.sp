@@ -54,6 +54,8 @@ ConVar sm_powerup_reverts_enable;
 
 ConVar tf_powerup_mode;
 ConVar tf_powerup_mode_imbalance_consecutive_min_players;
+ConVar tf_powerup_mode_dominant_multiplier;
+ConVar tf_powerup_mode_killcount_timer_length;
 ConVar tf_weapon_criticals;
 
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
@@ -71,6 +73,8 @@ public void OnPluginStart() {
 
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
 	tf_powerup_mode_imbalance_consecutive_min_players = FindConVar("tf_powerup_mode_imbalance_consecutive_min_players");
+	tf_powerup_mode_dominant_multiplier = FindConVar("tf_powerup_mode_dominant_multiplier");
+	tf_powerup_mode_killcount_timer_length = FindConVar("tf_powerup_mode_killcount_timer_length");
 	tf_weapon_criticals = FindConVar("tf_weapon_criticals");
 
 	tf_powerup_mode.AddChangeHook(TogglePowerupReverts);
@@ -192,8 +196,10 @@ public void OnGameFrame() {
 
 	if (frame % 66 == 0) {
 		if (IsRevertedPowerupMode()) {
-			// Set this to a high value such that imbalance team swap never happens
+			// Set these to high values such that they practically never happen
 			tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+			tf_powerup_mode_dominant_multiplier.IntValue = 999;
+			tf_powerup_mode_killcount_timer_length.IntValue = 999;
 
 			// Disable crits
 			tf_weapon_criticals.BoolValue = false;

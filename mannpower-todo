@@ -12,6 +12,7 @@ player
 - uber on spawn (implemented)
 - dropping powerup on disconnect (implemented?)
 - rune regen think (implemented)
+- no dominant state (implemented)
 capture flag (elaborate)
 - flag glow
 - standoff
@@ -20,9 +21,9 @@ capture flag (elaborate)
 - mark for death on poisonous flag
 gamerules (elaborate)
 - round start rune spawn (implemented)
-- basic functionality (?)
-- no dominations and revenge (not working)
+- no dominations and revenge (implemented)
 - prevent imbalance team swap (implemented)
+- no dominant state (implemented)
 - CanFlagBeCaptured
 - poisonous flag
 - CalcPlayerScore
@@ -45,7 +46,6 @@ buildings (elaborate)
 - Level3 skips Level2 anim when redeployed
 - double upgrade rate
 player
-- dominant state
 - deny team swapping
 - rage build reductions
 gamerules
