@@ -26,6 +26,27 @@ public Plugin myinfo = {
 	url = PLUGIN_URL
 };
 
+enum RuneTypes_t
+{
+	RUNE_NONE = -1,
+	RUNE_STRENGTH,
+	RUNE_HASTE,
+	RUNE_REGEN,
+	RUNE_RESIST,
+	RUNE_VAMPIRE,
+	RUNE_REFLECT,
+	RUNE_PRECISION,
+	RUNE_AGILITY,
+	RUNE_KNOCKOUT,
+	RUNE_KING,
+	RUNE_PLAGUE,
+	RUNE_SUPERNOVA,
+
+	// ADD NEW RUNE TYPE HERE, DO NOT RE-ORDER
+
+	RUNE_TYPES_MAX
+};
+
 bool g_bPowerupRevertsEnabled;
 int g_entMannpowerLogicEntity = -1;
 
@@ -203,7 +224,6 @@ public void OnEntityCreated(int entity, const char[] class) {
 
 	if (strncmp(class, "obj_", sizeof("obj_")) == 0) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
-		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
 	}
 	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle")) == 0) {
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_CTFSniperRifle_GetProjectileDamage_Pre);
@@ -229,14 +249,35 @@ Action SDKHookCB_OnTakeDamage_Building(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
-	ResetPowerupModeProp();
-	return Plugin_Continue;
-}
-void SDKHookCB_OnTakeDamagePost_Building(
-	int victim, int attacker, int inflictor, float damage, int damage_type,
-	int weapon, float damage_force[3], float damage_position[3], int damage_custom
-) {
 	ZeroPowerupModeProp();
+
+	Action returnValue = Plugin_Continue;
+
+	if (
+		IsRevertedPowerupMode() &&
+		attacker >= 1 && attacker <= MaxClients
+	) {
+		if (
+			GetCarryingRuneType(attacker) == RUNE_STRENGTH ||
+			TF2_IsPlayerInCondition(attacker, TFCond_CritRuneTemp)
+		) {
+			damage *= 2.0;
+			returnValue = Plugin_Changed;
+		}
+
+		if (GetCarryingRuneType(attacker) == RUNE_KNOCKOUT) {
+			damage *= 4.0;
+			returnValue = Plugin_Changed;
+		}
+
+		if (
+			GetCarryingRuneType(attacker) == RUNE_VAMPIRE &&
+			damage > 0.0
+		) {
+			TF2Util_TakeHealth(attacker, damage);
+		}
+	}
+	return returnValue;
 }
 
 // Handles uber respawn and temp rune spawning
@@ -318,4 +359,42 @@ void ZeroPowerupModeProp(bool bypass = false) {
 
 bool IsRevertedPowerupMode() {
 	return tf_powerup_mode.BoolValue && g_bPowerupRevertsEnabled;
+}
+
+TFCond GetConditionFromRuneType( RuneTypes_t rt )
+{
+	switch ( rt )
+	{ 
+	case RUNE_NONE:			return view_as<TFCond>(-1);
+	case RUNE_STRENGTH:		return TFCond_RuneStrength;
+	case RUNE_HASTE:		return TFCond_RuneHaste;
+	case RUNE_REGEN:		return TFCond_RuneRegen;
+	case RUNE_RESIST:		return TFCond_RuneResist;
+	case RUNE_VAMPIRE:		return TFCond_RuneVampire;
+	case RUNE_REFLECT:		return TFCond_RuneWarlock;
+	case RUNE_PRECISION:	return TFCond_RunePrecision;
+	case RUNE_AGILITY:		return TFCond_RuneAgility;
+	case RUNE_KNOCKOUT:		return TFCond_RuneKnockout;
+	case RUNE_KING:			return TFCond_KingRune;
+	case RUNE_PLAGUE:		return TFCond_PlagueRune;
+	case RUNE_SUPERNOVA:	return TFCond_SupernovaRune;
+	default:
+		LogError("Unexpected rune_type rt (%d) in GetConditionFromRuneType", rt);	
+	}
+
+	return view_as<TFCond>(-1);
+}
+
+static RuneTypes_t GetCarryingRuneType(int _this)
+{
+    RuneTypes_t retVal = RUNE_NONE;
+    for (RuneTypes_t i = view_as<RuneTypes_t>(0); i < RUNE_TYPES_MAX; ++i)
+    {
+        if (TF2_IsPlayerInCondition(_this, view_as<TFCond>(GetConditionFromRuneType(i))))
+        {
+            retVal = i;
+            break;
+        }
+    }
+    return retVal;
 }

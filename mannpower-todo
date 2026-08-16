@@ -5,8 +5,8 @@ where IsPowerupMode is called (server/shared):
 temp rune spawn (implemented)
 capture zone
 buildings
-- increased damage taken from strength, revenge, knockout (implemented?)
-- vampire leech (implemented?)
+- increased damage taken from strength, revenge, knockout (implemented)
+- vampire leech (implemented)
 sapper vampire leech
 player
 - uber on spawn (implemented)
