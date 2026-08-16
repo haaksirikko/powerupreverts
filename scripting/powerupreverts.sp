@@ -61,7 +61,6 @@ DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
-DynamicDetour detour_CTFGameRules_CalcDominationAndRevenge;
 
 MemoryPatch patch_HeavyGrappleJumpBoost;
 bool g_bHeavyGrapplePatchEnabled;
@@ -83,7 +82,6 @@ public void OnPluginStart() {
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
-	detour_CTFGameRules_CalcDominationAndRevenge = DynamicDetour.FromConf(conf, "CTFGameRules::CalcDominationAndRevenge");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -98,13 +96,11 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
-	VALIDATE_HANDLE(detour_CTFGameRules_CalcDominationAndRevenge);
 
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DetourCallback_CTFPlayer_StateEnterACTIVE_Pre);
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DetourCallback_CTFPlayer_StateEnterACTIVE_Post);
 	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Pre, DetourCallback_CTFGameRules_SetupOnRoundStart_Pre);
 	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Post, DetourCallback_CTFGameRules_SetupOnRoundStart_Post);
-	detour_CTFGameRules_CalcDominationAndRevenge.Enable(Hook_Pre, DetourCallback_CTFGameRules_CalcDominationAndRevenge_Pre);
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
@@ -131,9 +127,11 @@ public void OnConfigsExecuted() {
 	while ((ent = FindEntityByClassname(ent, "tf_logic_mannpower")) != -1) {
 		LogMessage("Detected Mannpower logic entity");
 		g_entMannpowerLogicEntity = ent;
+		EnablePowerupReverts();
+		return;
 	}
 
-	EnablePowerupReverts();
+	DisablePowerupReverts();
 }
 
 public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const char[] newValue) {
@@ -207,6 +205,8 @@ public void OnGameFrame() {
 
 public void OnClientPutInServer(int client) {
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
+	SDKHook(client, SDKHook_OnTakeDamageAlive, SDKHookCB_OnTakeDamageAlive);
+	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 }
@@ -235,13 +235,26 @@ public void OnEntityCreated(int entity, const char[] class) {
 	}
 }
 
-// Prevent some powerupmode modifiers on damage
+// Prevent powerupmode modifiers in ApplyOnDamageModifyRules
 Action SDKHookCB_OnTakeDamage(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
 	ZeroPowerupModeProp();
 	return Plugin_Continue;
+}
+Action SDKHookCB_OnTakeDamageAlive(
+	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
+	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
+) {
+	ResetPowerupModeProp();
+	return Plugin_Continue;
+}
+void SDKHookCB_OnTakeDamagePost(
+	int victim, int attacker, int inflictor, float damage, int damage_type,
+	int weapon, float damage_force[3], float damage_position[3], int damage_custom
+) {
+	ZeroPowerupModeProp();
 }
 
 // Building damage
@@ -334,14 +347,6 @@ MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Pre(Address _this) {
 }
 MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Post(Address _this) {
 	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-
-// Handles dominations (doesnt work)
-MRESReturn DetourCallback_CTFGameRules_CalcDominationAndRevenge_Pre(Address _this, DHookParam parameters) {
-	if (g_bPowerupRevertsEnabled && tf_powerup_mode.IntValue)
-		return MRES_Supercede;
-
 	return MRES_Ignored;
 }
 
