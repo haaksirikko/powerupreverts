@@ -44,6 +44,7 @@ DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
+DynamicDetour detour_CCaptureFlag_Capture;
 
 MemoryPatch patch_HeavyGrappleJumpBoost;
 bool g_bHeavyGrapplePatchEnabled;
@@ -70,6 +71,7 @@ public void OnPluginStart() {
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
+	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -87,11 +89,14 @@ public void OnPluginStart() {
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
+	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
 
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DetourCallback_CTFPlayer_StateEnterACTIVE_Pre);
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DetourCallback_CTFPlayer_StateEnterACTIVE_Post);
 	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Pre, DetourCallback_CTFGameRules_SetupOnRoundStart_Pre);
 	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Post, DetourCallback_CTFGameRules_SetupOnRoundStart_Post);
+	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DetourCallback_CCaptureFlag_Capture_Pre);
+	detour_CCaptureFlag_Capture.Enable(Hook_Post, DetourCallback_CCaptureFlag_Capture_Post);
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
@@ -343,6 +348,16 @@ MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Pre(Address _this) {
 	return MRES_Ignored;
 }
 MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Post(Address _this) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+
+// Capture sound
+MRESReturn DetourCallback_CCaptureFlag_Capture_Pre(int entity, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DetourCallback_CCaptureFlag_Capture_Post(int entity, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }

@@ -25,6 +25,13 @@
 				"linux"		"@_ZN15CTFGameMovement15CheckJumpButtonEv"
 				"windows"	"\x55\x8B\xEC\x83\xEC\x0C\x53\x56\x57\x8B\xF9\x8B\x4F\x04\x80\xB9\x84\x0B\x00\x00\x00"
 			}
+			// "CaptureFlag.TeamCapturedExcited", not the precache function
+			"CCaptureFlag::Capture"
+			{
+				"library"	"server"
+				"linux"		"@_ZN12CCaptureFlag7CaptureEP9CTFPlayeri"
+				"windows"	"\x55\x8B\xEC\x81\xEC\x80\x00\x00\x00\x57"
+			}
 		}
 
 		"Offsets"
@@ -129,6 +136,25 @@
 				"hooktype"	"entity"
 				"this"		"entity"
 				"return"	"float"
+			}
+
+			"CCaptureFlag::Capture"
+			{
+				"signature"	"CCaptureFlag::Capture"
+				"callconv"	"thiscall"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
+					}
+					"nCapturePoint"
+					{
+						"type"	"int"
+					}
+				}
 			}
 			"CTFPlayer::StateEnterACTIVE"
 			{
