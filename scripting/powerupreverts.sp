@@ -37,6 +37,8 @@ ConVar tf_powerup_mode_dominant_multiplier;
 ConVar tf_powerup_mode_killcount_timer_length;
 ConVar tf_weapon_criticals;
 
+DynamicHook dhook_CCaptureFlag_Think;
+DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
@@ -61,8 +63,11 @@ public void OnPluginStart() {
 	GameData conf = new GameData("powerupreverts");
 	if (conf == null) SetFailState("Failed to load powerupreverts gamedata");
 
+	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
+	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
+
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 
@@ -75,8 +80,11 @@ public void OnPluginStart() {
 
 	#define VALIDATE_HANDLE(%1) if (%1 == null) SetFailState("Failed to hook " ... #%1)
 
+	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
+	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
+
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
 
@@ -219,6 +227,12 @@ public void OnEntityCreated(int entity, const char[] class) {
 		SDKHook(entity, SDKHook_Spawn, SDKHookCB_Spawn);
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 	}
+	else if (StrEqual(class, "item_teamflag")) {
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_Think_Pre);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Think_Post);
+		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_PickUp_Pre);
+		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_PickUp_Post);
+	}
 }
 
 // Prevent powerupmode modifiers in ApplyOnDamageModifyRules
@@ -273,6 +287,24 @@ void SDKHookCB_SpawnPost(int entity) {
 			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Post, weapon, DHookCallback_CTFWeaponBaseMelee_DoMeleeDamage_Post);
 		}
 	}
+}
+
+// Poisonous flag
+MRESReturn DHookCallback_CCaptureFlag_Think_Pre(int entity) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_CCaptureFlag_Think_Post(int entity) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_CCaptureFlag_PickUp_Pre(int entity, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_CCaptureFlag_PickUp_Post(int entity, DHookParam parameters) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
 }
 
 // Melee damage

@@ -18,13 +18,6 @@
 				"linux"     "@_ZN12CTFGameRules17SetupOnRoundStartEv"
 				"windows"   "\x55\x8B\xEC\x83\xEC\x48\x53\x56\x8B\xD9"
 			}
-			// "player_domination"
-			"CTFGameRules::CalcDominationAndRevenge"
-			{
-				"library"	"server"
-				"linux"		"@_ZN12CTFGameRules24CalcDominationAndRevengeEP9CTFPlayerP11CBaseEntityS1_bPi"
-				"windows"	"\x55\x8B\xEC\x51\x56\x8B\xF1\x8B\x06\x8B\x80\x2A\x2A\x2A\x2A\xFF\xD0\x84\xC0\x0F\x85\x2A\x2A\x2A\x2A\x38\x86"
-			}
 			// "BumperCar.Jump", not the precache function
 			"CTFGameMovement::CheckJumpButton"
 			{
@@ -36,6 +29,16 @@
 
 		"Offsets"
 		{
+			"CCaptureFlag::Think"
+			{
+				"linux"		"50"
+				"windows"	"49"
+			}
+			"CCaptureFlag::PickUp"
+			{
+				"linux"		"270"
+				"windows"	"232"
+			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
 				"linux"		"483"
@@ -73,6 +76,31 @@
 
 		"Functions"
 		{
+			"CCaptureFlag::Think"
+			{
+				"offset"	"CCaptureFlag::Think"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+			}
+			"CCaptureFlag::PickUp"
+			{
+				"offset"	"CCaptureFlag::PickUp"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
+					}
+					"bInvisible"
+					{
+						"type"	"cbaseentity"
+					}
+				}
+			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
 				"offset"	"CTFWeaponBaseMelee::DoMeleeDamage"
@@ -115,36 +143,6 @@
 				"callconv"	"thiscall"
 				"this"		"address"
 				"return"	"void"
-			}
-			"CTFGameRules::CalcDominationAndRevenge"
-			{
-				"signature"	"CTFGameRules::CalcDominationAndRevenge"
-				"callconv"	"thiscall"
-				"this"		"address"
-				"return"	"void"
-				"arguments"
-				{
-					"pAttacker"
-					{
-						"type"	"cbaseentity"
-					}
-					"pWeapon"
-					{
-						"type"	"cbaseentity"
-					}
-					"pVictim"
-					{
-						"type"	"cbaseentity"
-					}
-					"bIsAssist"
-					{
-						"type"	"bool"
-					}
-					"piDeathFlags"
-					{
-						"type"	"int"
-					}
-				}
 			}
 		}
 	}

@@ -19,9 +19,9 @@ player
 capture flag (elaborate)
 - flag glow
 - standoff
-- flag marked poisonous
+- flag marked poisonous (implemented?)
 - custom capture sound
-- mark for death on poisonous flag
+- mark for death on poisonous flag (implemented?)
 gamerules (elaborate)
 - round start rune spawn (implemented)
 - no dominations and revenge (implemented)
