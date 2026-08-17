@@ -13,7 +13,7 @@
 #pragma newdecls required
 
 #define PLUGIN_NAME "Mannpower Reverts"
-#define PLUGIN_DESC "Reverts Mannpower changes made after May 2016"
+#define PLUGIN_DESC "Reverts various Mannpower nerfs"
 #define PLUGIN_AUTHOR "haaksirikko"
 #define PLUGIN_VERSION "0.1"
 #define PLUGIN_URL "https://castaway.tf"
@@ -127,13 +127,13 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 
 		if (g_entMannpowerLogicEntity != -1) {
 			EnablePowerupReverts();
+			return;
 		} else {
-			LogMessage("No Mannpower logic entity detected, disabling Mannpower Reverts");
-			DisablePowerupReverts();
+			LogMessage("No Mannpower logic entity detected");		
 		}
-	} else {
-		DisablePowerupReverts();
 	}
+
+	DisablePowerupReverts();
 }
 
 void EnablePowerupReverts() {
