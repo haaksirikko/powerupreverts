@@ -17,11 +17,11 @@ player
 - rune regen think (implemented)
 - no dominant state (implemented)
 capture flag (elaborate)
-- flag glow
+- flag glow (clientside)
 - standoff
-- flag marked poisonous (implemented?)
-- custom capture sound (implemented?)
-- mark for death on poisonous flag (implemented?)
+- flag marked poisonous (implemented)
+- custom capture sound (implemented)
+- mark for death on poisonous flag (implemented)
 gamerules (elaborate)
 - round start rune spawn (implemented)
 - no dominations and revenge (implemented)

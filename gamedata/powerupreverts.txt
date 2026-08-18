@@ -46,6 +46,11 @@
 				"linux"		"270"
 				"windows"	"232"
 			}
+			"CCaptureFlag::Drop"
+			{
+				"linux"		"271"
+				"windows"	"233"
+			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
 				"linux"		"483"
@@ -104,7 +109,33 @@
 					}
 					"bInvisible"
 					{
+						"type"	"bool"
+					}
+				}
+			}
+			"CCaptureFlag::Drop"
+			{
+				"offset"	"CCaptureFlag::Drop"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"pPlayer"
+					{
 						"type"	"cbaseentity"
+					}
+					"bVisible"
+					{
+						"type"	"bool"
+					}
+					"bThrown"
+					{
+						"type"	"bool"
+					}
+					"bMessage"
+					{
+						"type"	"bool"
 					}
 				}
 			}

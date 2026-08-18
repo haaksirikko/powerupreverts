@@ -39,6 +39,7 @@ ConVar tf_weapon_criticals;
 
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
+DynamicHook dhook_CCaptureFlag_Drop;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
@@ -46,10 +47,20 @@ DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
 DynamicDetour detour_CCaptureFlag_Capture;
 
+Handle hudsync;
+
+enum struct Player {
+	int flag;
+	int last_displayed_second;
+}
+Player players[MAXPLAYERS+1];
+
 MemoryPatch patch_HeavyGrappleJumpBoost;
 bool g_bHeavyGrapplePatchEnabled;
 
 public void OnPluginStart() {
+	hudsync = CreateHudSynchronizer();
+
 	sm_powerup_reverts_enable = CreateConVar("sm_powerup_reverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
 	sm_powerup_reverts_enable.AddChangeHook(TogglePowerupReverts);
 
@@ -66,6 +77,7 @@ public void OnPluginStart() {
 
 	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
+	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
 
@@ -84,6 +96,7 @@ public void OnPluginStart() {
 
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
+	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 
@@ -101,6 +114,14 @@ public void OnPluginStart() {
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
 		if (IsClientInGame(i)) OnClientPutInServer(i);
+	}
+
+	for (int i = MaxClients + 1; i < 2048; i++) {
+		char class[64];
+		if (IsValidEntity(i)) {
+			GetEntityClassname(i, class, sizeof(class));
+			OnEntityCreated(i, class);
+		}
 	}
 
 	LogMessage(PLUGIN_NAME ... " has loaded.");
@@ -186,18 +207,61 @@ int frame;
 public void OnGameFrame() {
 	frame++;
 
-	if (frame % 66 == 0) {
-		if (IsRevertedPowerupMode()) {
-			// Set these to high values such that they practically never happen
-			tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
-			tf_powerup_mode_dominant_multiplier.IntValue = 999;
-			tf_powerup_mode_killcount_timer_length.IntValue = 999;
+	if (!IsRevertedPowerupMode()) return;
 
-			// Disable crits
-			tf_weapon_criticals.BoolValue = false;
+	if (frame & 6 == 0) {
+		float flCurrentTime = GetGameTime();
 
-			ZeroPowerupModeProp();
+		for (int client = 1; client <= MaxClients; client++) {
+			int flag = players[client].flag;
+
+			if (
+				flag <= 0 ||
+				!IsValidEntity(flag) ||
+				!IsClientInGame(client) ||
+				!IsPlayerAlive(client)
+			) {
+				players[client].flag = -1;
+				continue;
+			}
+
+			float flTimeToSetPoisonous = GetEntPropFloat(flag, Prop_Send, "m_flTimeToSetPoisonous");
+			float flTimeLeft = flTimeToSetPoisonous - flCurrentTime;
+
+			if (flTimeLeft > 0.0)
+			{
+				int secondsLeft = RoundToCeil(flTimeLeft);
+				if (secondsLeft != players[client].last_displayed_second) {
+					players[client].last_displayed_second = secondsLeft;
+
+					ClearSyncHud(client, hudsync);
+
+					char message[32];
+					Format(message, sizeof(message), "           %d", secondsLeft);
+
+					SetHudTextParams(-1.0, 0.95, 1.1, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
+					ShowSyncHudText(client, hudsync, message);
+				}
+			}
+			else
+			{
+				ClearSyncHud(client, hudsync);
+				players[client].flag = -1;
+				players[client].last_displayed_second = -1;
+			}
 		}
+	}
+
+	if (frame % 66 == 0) {
+		// Set these to high values such that they practically never happen
+		tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+		tf_powerup_mode_dominant_multiplier.IntValue = 999;
+		tf_powerup_mode_killcount_timer_length.IntValue = 999;
+
+		// Disable crits
+		tf_weapon_criticals.BoolValue = false;
+
+		ZeroPowerupModeProp();
 	}
 }
 
@@ -212,6 +276,8 @@ public void OnClientPutInServer(int client) {
 // Handles rune drop on disconnect
 public void OnClientDisconnect(int client) {
 	ResetPowerupModeProp();
+	players[client].flag = -1;
+	players[client].last_displayed_second = -1;
 }
 public void OnClientDisconnect_Post(int client) {
 	ZeroPowerupModeProp();
@@ -237,6 +303,8 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Think_Post);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_PickUp_Pre);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_PickUp_Post);
+		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_Drop_Pre);
+		dhook_CCaptureFlag_Drop.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Drop_Post);
 	}
 }
 
@@ -248,6 +316,7 @@ Action SDKHookCB_OnTakeDamage(
 	ZeroPowerupModeProp();
 	return Plugin_Continue;
 }
+// Reset it here for dominations etc
 Action SDKHookCB_OnTakeDamageAlive(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
@@ -305,10 +374,33 @@ MRESReturn DHookCallback_CCaptureFlag_Think_Post(int entity) {
 }
 MRESReturn DHookCallback_CCaptureFlag_PickUp_Pre(int entity, DHookParam parameters) {
 	ResetPowerupModeProp();
+
+	int client = parameters.Get(1);
+	if (client >= 1 && client <= MaxClients) {
+		players[client].flag = entity;
+	}
 	return MRES_Ignored;
 }
 MRESReturn DHookCallback_CCaptureFlag_PickUp_Post(int entity, DHookParam parameters) {
 	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_CCaptureFlag_Drop_Pre(int entity, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_CCaptureFlag_Drop_Post(int entity, DHookParam parameters) {
+	ZeroPowerupModeProp();
+
+	int client = parameters.Get(1);
+	if (
+		client >= 1 && client <= MaxClients &&
+		players[client].flag == entity
+	) {
+		ClearSyncHud(client, hudsync);
+		players[client].flag = -1;
+		players[client].last_displayed_second = -1;
+	}
 	return MRES_Ignored;
 }
 
