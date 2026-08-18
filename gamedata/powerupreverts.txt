@@ -32,6 +32,13 @@
 				"linux"		"@_ZN12CCaptureFlag7CaptureEP9CTFPlayeri"
 				"windows"	"\x55\x8B\xEC\x81\xEC\x80\x00\x00\x00\x57"
 			}
+			// "mult_medigun_overheal_amount", shorter function, shouldn't contain "mult_medigun_overheal_decay"
+			"CWeaponMedigun::GetOverHealBonus"
+			{
+				"library"	"server"
+				"linux"		"@_ZN14CWeaponMedigun16GetOverHealBonusEP9CTFPlayer"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x08\xA1\x2A\x2A\x2A\x2A\xD9\xE8"
+			}
 		}
 
 		"Offsets"
@@ -200,6 +207,20 @@
 				"callconv"	"thiscall"
 				"this"		"address"
 				"return"	"void"
+			}
+			"CWeaponMedigun::GetOverHealBonus"
+			{
+				"signature"	"CWeaponMedigun::GetOverHealBonus"
+				"callconv"	"thiscall"
+				"this"		"entity"
+				"return"	"float"
+				"arguments"
+				{
+					"pTFTarget"
+					{
+						"type"	"cbaseentity"
+					}
+				}
 			}
 		}
 	}

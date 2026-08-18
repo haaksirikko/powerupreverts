@@ -31,6 +31,7 @@ int g_entMannpowerLogicEntity = -1;
 
 ConVar sm_powerup_reverts_enable;
 
+ConVar tf_max_health_boost;
 ConVar tf_powerup_mode;
 ConVar tf_powerup_mode_imbalance_consecutive_min_players;
 ConVar tf_powerup_mode_dominant_multiplier;
@@ -46,6 +47,7 @@ DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
 DynamicDetour detour_CCaptureFlag_Capture;
+DynamicDetour detour_CWeaponMedigun_GetOverHealBonus;
 
 Handle hudsync;
 
@@ -64,6 +66,7 @@ public void OnPluginStart() {
 	sm_powerup_reverts_enable = CreateConVar("sm_powerup_reverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
 	sm_powerup_reverts_enable.AddChangeHook(TogglePowerupReverts);
 
+	tf_max_health_boost = FindConVar("tf_max_health_boost");
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
 	tf_powerup_mode_imbalance_consecutive_min_players = FindConVar("tf_powerup_mode_imbalance_consecutive_min_players");
 	tf_powerup_mode_dominant_multiplier = FindConVar("tf_powerup_mode_dominant_multiplier");
@@ -84,6 +87,7 @@ public void OnPluginStart() {
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
+	detour_CWeaponMedigun_GetOverHealBonus = DynamicDetour.FromConf(conf, "CWeaponMedigun::GetOverHealBonus");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -103,13 +107,15 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
+	VALIDATE_HANDLE(detour_CWeaponMedigun_GetOverHealBonus);
 
-	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DetourCallback_CTFPlayer_StateEnterACTIVE_Pre);
-	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DetourCallback_CTFPlayer_StateEnterACTIVE_Post);
-	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Pre, DetourCallback_CTFGameRules_SetupOnRoundStart_Pre);
-	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Post, DetourCallback_CTFGameRules_SetupOnRoundStart_Post);
-	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DetourCallback_CCaptureFlag_Capture_Pre);
-	detour_CCaptureFlag_Capture.Enable(Hook_Post, DetourCallback_CCaptureFlag_Capture_Post);
+	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
+	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
+	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Pre, DHookCallback_Address_Pre);
+	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Post, DHookCallback_Address_Post);
+	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
+	detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
+	detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
@@ -291,19 +297,19 @@ public void OnEntityCreated(int entity, const char[] class) {
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
 	}
 	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle")) == 0) {
-		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_CTFSniperRifle_GetProjectileDamage_Pre);
-		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_CTFSniperRifle_GetProjectileDamage_Post);
+		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_EntReturn_Pre);
+		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_EntReturn_Post);
 	}
 	else if (StrEqual(class, "item_powerup_rune_temp")) {
 		SDKHook(entity, SDKHook_Spawn, SDKHookCB_Spawn);
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 	}
 	else if (StrEqual(class, "item_teamflag")) {
-		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_Think_Pre);
-		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Think_Post);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_Ent_Pre);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_Ent_Post);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_PickUp_Pre);
-		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_PickUp_Post);
-		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_Drop_Pre);
+		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_EntParams_Post);
+		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_EntParams_Pre);
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Drop_Post);
 	}
 }
@@ -357,21 +363,13 @@ void SDKHookCB_SpawnPost(int entity) {
 	if (entity >= 1 && entity <= MaxClients) {
 		int weapon = GetPlayerWeaponSlot(entity, TFWeaponSlot_Melee);
 		if (weapon > 0) {
-			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Pre, weapon, DHookCallback_CTFWeaponBaseMelee_DoMeleeDamage_Pre);
-			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Post, weapon, DHookCallback_CTFWeaponBaseMelee_DoMeleeDamage_Post);
+			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Pre, weapon, DHookCallback_EntParams_Pre);
+			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Post, weapon, DHookCallback_EntParams_Post);
 		}
 	}
 }
 
 // Poisonous flag
-MRESReturn DHookCallback_CCaptureFlag_Think_Pre(int entity) {
-	ResetPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_CCaptureFlag_Think_Post(int entity) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
 MRESReturn DHookCallback_CCaptureFlag_PickUp_Pre(int entity, DHookParam parameters) {
 	ResetPowerupModeProp();
 
@@ -379,14 +377,6 @@ MRESReturn DHookCallback_CCaptureFlag_PickUp_Pre(int entity, DHookParam paramete
 	if (client >= 1 && client <= MaxClients) {
 		players[client].flag = entity;
 	}
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_CCaptureFlag_PickUp_Post(int entity, DHookParam parameters) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_CCaptureFlag_Drop_Pre(int entity, DHookParam parameters) {
-	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
 MRESReturn DHookCallback_CCaptureFlag_Drop_Post(int entity, DHookParam parameters) {
@@ -404,52 +394,75 @@ MRESReturn DHookCallback_CCaptureFlag_Drop_Post(int entity, DHookParam parameter
 	return MRES_Ignored;
 }
 
-// Melee damage
-MRESReturn DHookCallback_CTFWeaponBaseMelee_DoMeleeDamage_Pre(int entity, DHookParam parameters) {
+MRESReturn DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre(int entity, DHookReturn returnValue, DHookParam parameters) {
+	if (IsRevertedPowerupMode()) {
+		float flOverhealBonus = tf_max_health_boost.FloatValue - 1.0;
+		float flMod = 1.0;
+		flMod = TF2Attrib_HookValueFloat(flMod, "mult_medigun_overheal_amount", entity);
+		int patient = parameters.Get(1);
+		if (patient >= 1 && patient <= MaxClients) {
+			flMod = TF2Attrib_HookValueFloat(flMod, "mult_patient_overheal_penalty", patient);
+
+			int weapon = GetEntPropEnt(patient, Prop_Send, "m_hActiveWeapon");
+			if (weapon > 0) {
+				flMod = TF2Attrib_HookValueFloat(flMod, "mult_patient_overheal_penalty_active", weapon);
+			}
+		}
+
+		if (flMod >= 1.0)
+		{
+			flOverhealBonus += flMod;
+		}
+		else if (flMod < 1.0 && flOverhealBonus > 0.0)
+		{
+			flOverhealBonus *= flMod;
+			flOverhealBonus += 1.0;
+		}
+
+		// Safety net
+		if (flOverhealBonus < 1.0)
+		{
+			flOverhealBonus = 1.0;
+		}
+
+		returnValue.Value = flOverhealBonus;
+		return MRES_Override;
+	}
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_Ent_Pre(int client) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_CTFWeaponBaseMelee_DoMeleeDamage_Post(int entity, DHookParam parameters) {
+MRESReturn DHookCallback_Ent_Post(int client) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
 
-// Sniper rifle precision damage bonus
-MRESReturn DHookCallback_CTFSniperRifle_GetProjectileDamage_Pre(int entity, DHookReturn returnValue) {
+MRESReturn DHookCallback_EntReturn_Pre(int entity, DHookReturn returnValue) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_CTFSniperRifle_GetProjectileDamage_Post(int entity, DHookReturn returnValue) {
+MRESReturn DHookCallback_EntReturn_Post(int entity, DHookReturn returnValue) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
 
-// Handles Mannpower regen application
-MRESReturn DetourCallback_CTFPlayer_StateEnterACTIVE_Pre(int client) {
+MRESReturn DHookCallback_EntParams_Pre(int entity, DHookParam parameters) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DetourCallback_CTFPlayer_StateEnterACTIVE_Post(int client) {
+MRESReturn DHookCallback_EntParams_Post(int entity, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
 
-// Handles Mannpower logic on round start (spawns runes)
-MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Pre(Address _this) {
+MRESReturn DHookCallback_Address_Pre(Address _this) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DetourCallback_CTFGameRules_SetupOnRoundStart_Post(Address _this) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-
-// Capture sound
-MRESReturn DetourCallback_CCaptureFlag_Capture_Pre(int entity, DHookParam parameters) {
-	ResetPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DetourCallback_CCaptureFlag_Capture_Post(int entity, DHookParam parameters) {
+MRESReturn DHookCallback_Address_Post(Address _this) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
