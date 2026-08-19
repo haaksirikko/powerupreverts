@@ -48,6 +48,7 @@ DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
 DynamicDetour detour_CCaptureFlag_Capture;
 DynamicDetour detour_CWeaponMedigun_GetOverHealBonus;
+DynamicDetour detour_CCaptureZone_Capture;
 
 Handle hudsync;
 
@@ -88,6 +89,7 @@ public void OnPluginStart() {
 	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
 	detour_CWeaponMedigun_GetOverHealBonus = DynamicDetour.FromConf(conf, "CWeaponMedigun::GetOverHealBonus");
+	detour_CCaptureZone_Capture = DynamicDetour.FromConf(conf, "CCaptureZone::Capture");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -108,6 +110,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
 	VALIDATE_HANDLE(detour_CWeaponMedigun_GetOverHealBonus);
+	VALIDATE_HANDLE(detour_CCaptureZone_Capture);
 
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
@@ -116,6 +119,8 @@ public void OnPluginStart() {
 	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
 	detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
 	detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
+	detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
+	detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
@@ -243,9 +248,9 @@ public void OnGameFrame() {
 					ClearSyncHud(client, hudsync);
 
 					char message[32];
-					Format(message, sizeof(message), "           %d", secondsLeft);
+					Format(message, sizeof(message), "Poison in %ds", secondsLeft);
 
-					SetHudTextParams(-1.0, 0.95, 1.1, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
+					SetHudTextParams(-1.0, 0.925, 1.1, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
 					ShowSyncHudText(client, hudsync, message);
 				}
 			}
