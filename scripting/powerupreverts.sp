@@ -139,8 +139,7 @@ public void OnPluginStart() {
 }
 
 public void OnPluginEnd() {
-	ApplyHeavyGrappleJumpBoost(false);
-	ResetPowerupModeProp();
+	DisablePowerupReverts();
 	LogMessage(PLUGIN_NAME ... " has unloaded.");
 }
 
@@ -221,7 +220,7 @@ public void OnGameFrame() {
 	if (!IsRevertedPowerupMode()) return;
 
 	if (frame & 6 == 0) {
-		float flCurrentTime = GetGameTime();
+		float curtime = GetGameTime();
 
 		for (int client = 1; client <= MaxClients; client++) {
 			int flag = players[client].flag;
@@ -236,19 +235,17 @@ public void OnGameFrame() {
 				continue;
 			}
 
-			float flTimeToSetPoisonous = GetEntPropFloat(flag, Prop_Send, "m_flTimeToSetPoisonous");
-			float flTimeLeft = flTimeToSetPoisonous - flCurrentTime;
-
-			if (flTimeLeft > 0.0)
+			float time = GetEntPropFloat(flag, Prop_Send, "m_flTimeToSetPoisonous") - curtime;
+			if (time > 0.0)
 			{
-				int secondsLeft = RoundToCeil(flTimeLeft);
-				if (secondsLeft != players[client].last_displayed_second) {
-					players[client].last_displayed_second = secondsLeft;
+				int second = RoundToCeil(time);
+				if (second != players[client].last_displayed_second) {
+					players[client].last_displayed_second = second;
 
 					ClearSyncHud(client, hudsync);
 
 					char message[32];
-					Format(message, sizeof(message), "Poison in %ds", secondsLeft);
+					Format(message, sizeof(message), "Poison in %ds", second);
 
 					SetHudTextParams(-1.0, 0.925, 1.1, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
 					ShowSyncHudText(client, hudsync, message);
@@ -269,7 +266,7 @@ public void OnGameFrame() {
 		tf_powerup_mode_dominant_multiplier.IntValue = 999;
 		tf_powerup_mode_killcount_timer_length.IntValue = 999;
 
-		// Disable crits
+		// Disable crits. TODO: add hidden no-crit attribute to all weapons instead
 		tf_weapon_criticals.BoolValue = false;
 
 		ZeroPowerupModeProp();
@@ -436,6 +433,7 @@ MRESReturn DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre(int entity, DHookR
 	return MRES_Ignored;
 }
 
+// Generic callbacks so the plugin doesn't get bloated with a bajillion functions that do the same thing
 MRESReturn DHookCallback_Ent_Pre(int client) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
