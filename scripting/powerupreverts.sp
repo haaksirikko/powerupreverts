@@ -220,17 +220,18 @@ void ApplyHeavyGrappleJumpBoost(bool enable) {
 int frame;
 public void OnGameFrame() {
 	frame++;
+	int client;
 
 	if (!IsRevertedPowerupMode()) return;
 
-	for (int client = 1; client <= MaxClients; client++) {
+	for (client = 1; client <= MaxClients; client++) {
 		UpdateFreeRide(client);
 	}
 
 	if (frame & 6 == 0) {
 		float curtime = GetGameTime();
 
-		for (int client = 1; client <= MaxClients; client++) {
+		for (client = 1; client <= MaxClients; client++) {
 			int flag = players[client].flag;
 
 			if (
@@ -511,8 +512,11 @@ void ClearFreeRide(int client) {
 }
 
 void UpdateFreeRide(int client) {
-	if (!IsClientInGame(client) || !IsPlayerAlive(client) ||
-		TF2_GetPlayerClass(client) != TFClass_Medic) {
+	if (
+		!IsClientInGame(client) ||
+		!IsPlayerAlive(client) ||
+		TF2_GetPlayerClass(client) != TFClass_Medic
+	) {
 		ClearFreeRide(client);
 		return;
 	}
@@ -525,14 +529,17 @@ void UpdateFreeRide(int client) {
 
 	int patient = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
 
-	if (patient >= 1 && patient <= MaxClients &&
-		IsClientInGame(patient) && IsPlayerAlive(patient) &&
-		GetEntPropEnt(patient, Prop_Send, "m_hGrapplingHookTarget") > 0) {
+	if (
+		patient >= 1 && patient <= MaxClients &&
+		IsClientInGame(patient) &&
+		IsPlayerAlive(patient) &&
+		GetEntPropEnt(patient, Prop_Send, "m_hGrapplingHookTarget") > 0
+	) {
 
 		if (players[client].free_ride_patient != patient) {
 			SetEntPropEnt(client, Prop_Send, "m_hGrapplingHookTarget", patient);
-			TF2_AddCondition(client, TFCond_GrapplingHookSafeFall, TFCondDuration_Infinite);
-			TF2_AddCondition(client, TFCond_GrapplingHookLatched, TFCondDuration_Infinite);
+			TF2_AddCondition(client, TFCond_GrapplingHookSafeFall);
+			TF2_AddCondition(client, TFCond_GrapplingHookLatched);
 			players[client].free_ride_patient = patient;
 		}
 	} else {
