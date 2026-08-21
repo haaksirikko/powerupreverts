@@ -55,6 +55,7 @@ Handle hudsync;
 enum struct Player {
 	int flag;
 	int last_displayed_second;
+	int free_ride_patient;
 }
 Player players[MAXPLAYERS+1];
 
@@ -195,6 +196,9 @@ void DisablePowerupReverts() {
 	g_bPowerupRevertsEnabled = false;
 	ResetPowerupModeProp(true);
 	ApplyHeavyGrappleJumpBoost(false);
+	for (int client = 1; client <= MaxClients; client++) {
+		ClearFreeRide(client);
+	}
 	LogMessage("Mannpower Reverts disabled");
 }
 
@@ -218,6 +222,10 @@ public void OnGameFrame() {
 	frame++;
 
 	if (!IsRevertedPowerupMode()) return;
+
+	for (int client = 1; client <= MaxClients; client++) {
+		UpdateFreeRide(client);
+	}
 
 	if (frame & 6 == 0) {
 		float curtime = GetGameTime();
@@ -284,6 +292,7 @@ public void OnClientPutInServer(int client) {
 // Handles rune drop on disconnect
 public void OnClientDisconnect(int client) {
 	ResetPowerupModeProp();
+	ClearFreeRide(client);
 	players[client].flag = -1;
 	players[client].last_displayed_second = -1;
 }
@@ -484,5 +493,46 @@ void ZeroPowerupModeProp(bool bypass = false) {
 
 bool IsRevertedPowerupMode() {
 	return tf_powerup_mode.BoolValue && g_bPowerupRevertsEnabled;
+}
+
+void ClearFreeRide(int client) {
+	if (players[client].free_ride_patient == 0) return;
+
+	if (IsClientInGame(client)) {
+		SetEntPropEnt(client, Prop_Send, "m_hGrapplingHookTarget", -1);
+		TF2_RemoveCondition(client, TFCond_GrapplingHookSafeFall);
+		TF2_RemoveCondition(client, TFCond_GrapplingHookLatched);
+	}
+	players[client].free_ride_patient = 0;
+}
+
+void UpdateFreeRide(int client) {
+	if (!IsClientInGame(client) || !IsPlayerAlive(client) ||
+		TF2_GetPlayerClass(client) != TFClass_Medic) {
+		ClearFreeRide(client);
+		return;
+	}
+
+	int medigun = GetPlayerWeaponSlot(client, TFWeaponSlot_Secondary);
+	if (medigun <= 0) {
+		ClearFreeRide(client);
+		return;
+	}
+
+	int patient = GetEntPropEnt(medigun, Prop_Send, "m_hHealingTarget");
+
+	if (patient >= 1 && patient <= MaxClients &&
+		IsClientInGame(patient) && IsPlayerAlive(patient) &&
+		GetEntPropEnt(patient, Prop_Send, "m_hGrapplingHookTarget") > 0) {
+
+		if (players[client].free_ride_patient != patient) {
+			SetEntPropEnt(client, Prop_Send, "m_hGrapplingHookTarget", patient);
+			TF2_AddCondition(client, TFCond_GrapplingHookSafeFall, TFCondDuration_Infinite);
+			TF2_AddCondition(client, TFCond_GrapplingHookLatched, TFCondDuration_Infinite);
+			players[client].free_ride_patient = patient;
+		}
+	} else {
+		ClearFreeRide(client);
+	}
 }
 
