@@ -237,9 +237,13 @@ public void OnGameFrame() {
 				flag <= 0 ||
 				!IsValidEntity(flag) ||
 				!IsClientInGame(client) ||
-				!IsPlayerAlive(client)
+				!IsPlayerAlive(client) ||
+				IsFakeClient(client) ||
+				IsClientReplay(client) ||
+				IsClientSourceTV(client)
 			) {
 				players[client].flag = -1;
+				players[client].last_displayed_second = -1;
 				continue;
 			}
 
