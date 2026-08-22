@@ -41,6 +41,7 @@ ConVar tf_weapon_criticals;
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CCaptureFlag_Drop;
+DynamicHook dhook_CTFGameRules_PlayerKilled;
 DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
 DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
@@ -84,6 +85,7 @@ public void OnPluginStart() {
 	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
+	dhook_CTFGameRules_PlayerKilled = DynamicHook.FromConf(conf, "CTFGameRules::PlayerKilled");
 	dhook_CTFGameRules_SetupOnRoundStart = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	dhook_CTFGameRules_SetupOnRoundRunning = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundRunning");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
@@ -106,6 +108,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
+	VALIDATE_HANDLE(dhook_CTFGameRules_PlayerKilled);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
@@ -158,6 +161,8 @@ public void OnConfigsExecuted() {
 		g_entMannpowerLogicEntity = ent;
 		EnablePowerupReverts();
 
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
 		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
 		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
 		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
@@ -294,7 +299,6 @@ public void OnGameFrame() {
 
 public void OnClientPutInServer(int client) {
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
-	SDKHook(client, SDKHook_OnTakeDamageAlive, SDKHookCB_OnTakeDamageAlive);
 	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
@@ -336,20 +340,12 @@ public void OnEntityCreated(int entity, const char[] class) {
 	}
 }
 
-// Prevent powerupmode modifiers in ApplyOnDamageModifyRules
+// Prevent powerupmode modifiers for damage
 Action SDKHookCB_OnTakeDamage(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
 	ZeroPowerupModeProp();
-	return Plugin_Continue;
-}
-// Reset it here for dominations etc
-Action SDKHookCB_OnTakeDamageAlive(
-	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
-	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
-) {
-	ResetPowerupModeProp();
 	return Plugin_Continue;
 }
 void SDKHookCB_OnTakeDamagePost(
@@ -486,6 +482,15 @@ MRESReturn DHookCallback_Address_Pre(Address _this) {
 	return MRES_Ignored;
 }
 MRESReturn DHookCallback_Address_Post(Address _this) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_AddressParams_Pre(Address _this, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_AddressParams_Post(Address _this, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }

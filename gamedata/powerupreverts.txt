@@ -58,6 +58,11 @@
 				"linux"		"271"
 				"windows"	"233"
 			}
+			"CTFGameRules::PlayerKilled"
+			{
+				"linux"		"82"
+				"windows"	"81"
+			}
 			"CTFGameRules::SetupOnRoundStart"
 			{
 				"linux"		"194"
@@ -153,6 +158,24 @@
 					"bMessage"
 					{
 						"type"	"bool"
+					}
+				}
+			}
+			"CTFGameRules::PlayerKilled"
+			{
+				"offset"	"CTFGameRules::PlayerKilled"
+				"hooktype"	"gamerules"
+				"this"		"address"
+				"return"	"void"
+				"arguments"
+				{
+					"pVictim"
+					{
+						"type"	"cbaseentity"
+					}
+					"info"
+					{
+						"type"	"int"
 					}
 				}
 			}
