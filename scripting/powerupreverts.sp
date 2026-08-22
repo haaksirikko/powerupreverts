@@ -41,11 +41,12 @@ ConVar tf_weapon_criticals;
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CCaptureFlag_Drop;
+DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
+DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
-DynamicDetour detour_CTFGameRules_SetupOnRoundStart;
 DynamicDetour detour_CCaptureFlag_Capture;
 DynamicDetour detour_CWeaponMedigun_GetOverHealBonus;
 DynamicDetour detour_CCaptureZone_Capture;
@@ -83,11 +84,12 @@ public void OnPluginStart() {
 	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
+	dhook_CTFGameRules_SetupOnRoundStart = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
+	dhook_CTFGameRules_SetupOnRoundRunning = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundRunning");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
-	detour_CTFGameRules_SetupOnRoundStart = DynamicDetour.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
 	detour_CWeaponMedigun_GetOverHealBonus = DynamicDetour.FromConf(conf, "CWeaponMedigun::GetOverHealBonus");
 	detour_CCaptureZone_Capture = DynamicDetour.FromConf(conf, "CCaptureZone::Capture");
@@ -104,19 +106,18 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
+	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
+	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
-	VALIDATE_HANDLE(detour_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
 	VALIDATE_HANDLE(detour_CWeaponMedigun_GetOverHealBonus);
 	VALIDATE_HANDLE(detour_CCaptureZone_Capture);
 
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
-	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Pre, DHookCallback_Address_Pre);
-	detour_CTFGameRules_SetupOnRoundStart.Enable(Hook_Post, DHookCallback_Address_Post);
 	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
 	detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
 	detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
@@ -156,6 +157,11 @@ public void OnConfigsExecuted() {
 		LogMessage("Detected Mannpower logic entity");
 		g_entMannpowerLogicEntity = ent;
 		EnablePowerupReverts();
+
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
 		return;
 	}
 

@@ -11,13 +11,6 @@
 				"linux"     "@_ZN9CTFPlayer16StateEnterACTIVEEv"
 				"windows"   "\x53\x56\x57\x6A\x00\x6A\x02\x8B\xF1"
 			}
-			// "models/props_trainyard/bomb_eotl_", not the precache function
-			"CTFGameRules::SetupOnRoundStart"
-			{
-				"library"   "server"
-				"linux"     "@_ZN12CTFGameRules17SetupOnRoundStartEv"
-				"windows"   "\x55\x8B\xEC\x83\xEC\x48\x53\x56\x8B\xD9"
-			}
 			// "BumperCar.Jump", not the precache function
 			"CTFGameMovement::CheckJumpButton"
 			{
@@ -64,6 +57,16 @@
 			{
 				"linux"		"271"
 				"windows"	"233"
+			}
+			"CTFGameRules::SetupOnRoundStart"
+			{
+				"linux"		"194"
+				"windows"	"192"
+			}
+			"CTFGameRules::SetupOnRoundRunning"
+			{
+				"linux"		"195"
+				"windows"	"193"
 			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
@@ -153,6 +156,20 @@
 					}
 				}
 			}
+			"CTFGameRules::SetupOnRoundStart"
+			{
+				"offset"	"CTFGameRules::SetupOnRoundStart"
+				"hooktype"	"gamerules"
+				"this"		"address"
+				"return"	"void"
+			}
+			"CTFGameRules::SetupOnRoundRunning"
+			{
+				"offset"	"CTFGameRules::SetupOnRoundRunning"
+				"hooktype"	"gamerules"
+				"this"		"address"
+				"return"	"void"
+			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
 				"offset"	"CTFWeaponBaseMelee::DoMeleeDamage"
@@ -207,13 +224,6 @@
 				"callconv"  "thiscall"
 				"this"      "entity"
 				"return"    "void"
-			}
-			"CTFGameRules::SetupOnRoundStart"
-			{
-				"signature"	"CTFGameRules::SetupOnRoundStart"
-				"callconv"	"thiscall"
-				"this"		"address"
-				"return"	"void"
 			}
 			"CWeaponMedigun::GetOverHealBonus"
 			{

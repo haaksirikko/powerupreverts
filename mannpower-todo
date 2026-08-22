@@ -3,7 +3,7 @@ todo list (incomplete)
 where IsPowerupMode is called (server/shared):
 
 temp rune spawn (implemented)
-capture zone
+capture zone (implemented?)
 buildings
 - increased damage taken from strength, revenge, knockout (implemented)
 - vampire leech (implemented)
@@ -16,9 +16,10 @@ player
 - dropping powerup on disconnect (implemented?)
 - rune regen think (implemented)
 - no dominant state (implemented)
+- undo rage build reductions
 capture flag (elaborate)
 - flag glow (clientside)
-- standoff
+- standoff (works?)
 - flag marked poisonous (implemented)
 - custom capture sound (implemented)
 - mark for death on poisonous flag (implemented)
@@ -48,7 +49,6 @@ things we dont want (wont be applied if IsPowerupMode false):
 ammo pack charge gain
 player
 - deny team swapping
-- rage build reductions
 gamerules
 - no airborne (mini)crit bonuses
 - minicrits cancel +30% bonus
@@ -70,12 +70,10 @@ medic free ride (implemented)
 medic overheal on powerup (implemented?)
 
 tf2 patch notes
- * May 11, 2016 Patch
+* May 11, 2016 Patch
+    Players can no longer change teams in Mannpower Mode.
 
-    Players can no longer change teams in Mannpower Mode. (The big one)
-
- * August 2, 2017 Patch 1
-
+* August 2, 2017 Patch 1
     All-class
         Players can no longer taunt when grappled to an enemy. (you can still taunt if an enemy has grappled to you)
         Players can no longer grapple while frozen before a round starts or while stunned.
@@ -99,13 +97,11 @@ tf2 patch notes
     Resistance and Vampire
         Added immunity to reflect damage.
 
- * October 20, 2017 Patch 1 (Jungle Inferno Update)
-
+* October 20, 2017 Patch 1 (Jungle Inferno Update)
     Knockout powerup now collects health pack health without subtracting their health bonus. Results in Knockout carriers collecting more health from each health kit.
     Resistance powerup now blocks backstabs.
  
- * October 1, 2020 Patch (Scream Fortress XII)
-
+* October 1, 2020 Patch (Scream Fortress XII)
     Gameplay Changes
         Flag carrier grapple movement speed reduced
             Scout with no powerup or with Agility powerup – reduced to 0.8x regular grapple movement speed (down from regular grapple movement speed in previous version)
@@ -165,8 +161,7 @@ tf2 patch notes
                 tf_powerup_mode_dominant_multiplier – the multiple over the server median that a player’s kill count needs to be in order to be determined dominant
                 tf_powerup_mode_killcount_timer_length – the time interval to wait between tests for dominant players
 
-November 5, 2020 Patch
-
+* November 5, 2020 Patch
     Dominant players are now marked for death only when carrying a powerup
     Shield charge meter passive refill rate reduced. Reduction is greater when carrying a powerup
     Items or actions that add to the shield charge meter now add less when carrying a powerup
