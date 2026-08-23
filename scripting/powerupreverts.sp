@@ -75,6 +75,8 @@ DynamicDetour detour_CCaptureZone_Capture;
 DynamicDetour detour_CTFRadiusDamageInfo_CalculateFalloff;
 DynamicDetour detour_CObjectSapper_SapperThink;
 
+MemoryPatch patch_HeavyGrappleJumpBoost;
+
 Handle hudsync;
 
 enum struct Player {
@@ -83,9 +85,6 @@ enum struct Player {
 	int free_ride_patient;
 }
 Player players[MAXPLAYERS+1];
-
-MemoryPatch patch_HeavyGrappleJumpBoost;
-bool g_bHeavyGrapplePatchEnabled;
 
 public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
@@ -584,16 +583,13 @@ void DisablePowerupReverts() {
 
 void ApplyHeavyGrappleJumpBoost(bool enable) {
 	if (patch_HeavyGrappleJumpBoost == null) return;
-	if (enable == g_bHeavyGrapplePatchEnabled) return;
 
 	if (enable) {
 		if (patch_HeavyGrappleJumpBoost.Enable()) {
-			g_bHeavyGrapplePatchEnabled = true;
 			LogMessage("Heavy grapple jump boost revert enabled");
 		}
 	} else {
 		patch_HeavyGrappleJumpBoost.Disable();
-		g_bHeavyGrapplePatchEnabled = false;
 	}
 }
 
