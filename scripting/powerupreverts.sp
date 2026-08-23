@@ -313,6 +313,13 @@ public void OnClientDisconnect_Post(int client) {
 public void OnEntityCreated(int entity, const char[] class) {
 	if (entity < 0 || entity >= 2048) return;
 
+	if (
+		strncmp(class, "tf_weapon", sizeof("tf_weapon") - 1) == 0 ||
+		strncmp(class, "saxxy", sizeof("saxxy") - 1) == 0
+	) {
+		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPostWeapon);
+	}
+
 	if (StrContains(class, "obj_") == 0) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
@@ -323,7 +330,7 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Pre, entity, DHookCallback_Ent_Pre);
 		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Post, entity, DHookCallback_Ent_Post);
 	}
-	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle")) == 0) {
+	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle") - 1) == 0) {
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_EntReturn_Pre);
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_EntReturn_Post);
 	}
@@ -354,19 +361,13 @@ public Action Event_OnPostInventoryApplication(Event event, const char[] name, b
 	else {
 		TF2Attrib_RemoveByName(client, "cancel falling damage");
 	}
-
-	int length = GetEntPropArraySize(client, Prop_Send, "m_hMyWeapons");
-	for (int i = 0; i < length; i++)
-	{
-		int weapon = GetEntPropEnt(client, Prop_Send, "m_hMyWeapons", i);
-		if (weapon != -1)
-		{
-			// disable crits
-			TF2Attrib_SetByName(weapon, "crit mod disabled hidden", 0.0);
-		}
-	}
 	
 	return Plugin_Continue;
+}
+
+void SDKHookCB_SpawnPostWeapon(int entity) {
+	// disable crits
+	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
 }
 
 // Prevent powerupmode modifiers for damage
