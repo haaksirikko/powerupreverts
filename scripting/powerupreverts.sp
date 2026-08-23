@@ -18,6 +18,27 @@
 #define PLUGIN_VERSION "0.1"
 #define PLUGIN_URL "https://castaway.tf"
 
+enum RuneTypes_t
+{
+	RUNE_NONE = -1,
+	RUNE_STRENGTH,
+	RUNE_HASTE,
+	RUNE_REGEN,
+	RUNE_RESIST,
+	RUNE_VAMPIRE,
+	RUNE_REFLECT,
+	RUNE_PRECISION,
+	RUNE_AGILITY,
+	RUNE_KNOCKOUT,
+	RUNE_KING,
+	RUNE_PLAGUE,
+	RUNE_SUPERNOVA,
+
+	// ADD NEW RUNE TYPE HERE, DO NOT RE-ORDER
+
+	RUNE_TYPES_MAX
+};
+
 public Plugin myinfo = {
 	name = PLUGIN_NAME,
 	description = PLUGIN_DESC,
@@ -321,6 +342,23 @@ Action SDKHookCB_OnTakeDamage(
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
 	ZeroPowerupModeProp();
+
+	// Vampire heal on burn damage
+	if (
+		IsRevertedPowerupMode() &&
+		damage_type == (DMG_BURN | DMG_PREVENT_PHYSICS_FORCE) &&
+		victim >= 1 && victim <= MaxClients
+	) {
+		int provider = TF2Util_GetPlayerConditionProvider(victim, TFCond_OnFire);
+		if (
+			provider != victim &&
+			provider >= 1 && provider <= MaxClients &&
+			GetCarryingRuneType(provider) == RUNE_VAMPIRE
+		) {
+			TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);	
+		}
+	}
+
 	return Plugin_Continue;
 }
 
@@ -570,5 +608,41 @@ void UpdateFreeRide(int client) {
 	} else {
 		ClearFreeRide(client);
 	}
+}
+
+TFCond GetConditionFromRuneType(RuneTypes_t rune)
+{
+	switch (rune) { 
+		case RUNE_NONE:			return view_as<TFCond>(-1);
+		case RUNE_STRENGTH:		return TFCond_RuneStrength;
+		case RUNE_HASTE:		return TFCond_RuneHaste;
+		case RUNE_REGEN:		return TFCond_RuneRegen;
+		case RUNE_RESIST:		return TFCond_RuneResist;
+		case RUNE_VAMPIRE:		return TFCond_RuneVampire;
+		case RUNE_REFLECT:		return TFCond_RuneWarlock;
+		case RUNE_PRECISION:	return TFCond_RunePrecision;
+		case RUNE_AGILITY:		return TFCond_RuneAgility;
+		case RUNE_KNOCKOUT:		return TFCond_RuneKnockout;
+		case RUNE_KING:			return TFCond_KingRune;
+		case RUNE_PLAGUE:		return TFCond_PlagueRune;
+		case RUNE_SUPERNOVA:	return TFCond_SupernovaRune;
+		default: LogError("Unexpected rune_type rt (%d) in GetConditionFromRuneType", rune);	
+	}
+
+	return view_as<TFCond>(-1);
+}
+
+static RuneTypes_t GetCarryingRuneType(int client)
+{
+    RuneTypes_t rune = RUNE_NONE;
+    for (RuneTypes_t i = view_as<RuneTypes_t>(0); i < RUNE_TYPES_MAX; ++i)
+    {
+        if (TF2_IsPlayerInCondition(client, GetConditionFromRuneType(i)))
+        {
+            rune = i;
+            break;
+        }
+    }
+    return rune;
 }
 

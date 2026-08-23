@@ -34,7 +34,7 @@ gamerules (elaborate)
 - scout no fall damage (use pbpp instead?)
 - precision radius damage falloff
 player shared
-- burn damage vampire leech
+- burn damage vampire leech (implemented?)
 weapons
 - knife
  - kunai delta health (?)
