@@ -10,7 +10,7 @@ buildings
 - 1 sec total construction time (implemented)
 - Level3 skips Level2 anim when redeployed (implemented)
 - double upgrade rate (implemented)
-sapper vampire leech
+sapper vampire leech (implemented?)
 player
 - uber on spawn (implemented)
 - dropping powerup on disconnect (implemented?)
