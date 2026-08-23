@@ -18,7 +18,7 @@ player
 - no dominant state (implemented)
 - undo rage build reductions (implemented)
 capture flag (elaborate)
-- flag glow (clientside)
+- flag glow (clientside, look to another implementation perhaps)
 - standoff (works?)
 - flag marked poisonous (implemented)
 - custom capture sound (implemented)
@@ -32,7 +32,7 @@ gamerules (elaborate)
 - poisonous flag
 - CalcPlayerScore
 - scout no fall damage (use pbpp instead?)
-- precision radius damage falloff
+- precision no radius damage falloff (implemented)
 player shared
 - burn damage vampire leech (implemented?)
 weapons

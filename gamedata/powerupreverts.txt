@@ -39,6 +39,13 @@
 				"linux"		"@_ZN12CCaptureZone7CaptureEP11CBaseEntity"
 				"windows"	"\x55\x8B\xEC\x51\x53\x57\x8B\x7D\x2A\x8B\xD9\x85\xFF\x0F\x84"
 			}
+			// "mult_dmg_falloff"
+			"CTFRadiusDamageInfo::CalculateFalloff"
+			{
+				"library"	"server"
+				"linux"		"@_ZN19CTFRadiusDamageInfo16CalculateFalloffEv"
+				"windows"	"\x55\x8B\xEC\x51\xF3\x0F\x10\x05\x2A\x2A\x2A\x2A\x57"
+			}
 		}
 
 		"Offsets"
@@ -325,6 +332,13 @@
 						"type"	"cbaseentity"
 					}
 				}
+			}
+			"CTFRadiusDamageInfo::CalculateFalloff"
+			{
+				"signature"	"CTFRadiusDamageInfo::CalculateFalloff"
+				"callconv"	"thiscall"
+				"this"		"address"
+				"return"	"void"
 			}
 		}
 	}

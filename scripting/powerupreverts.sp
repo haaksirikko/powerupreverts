@@ -75,6 +75,7 @@ DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CCaptureFlag_Capture;
 DynamicDetour detour_CWeaponMedigun_GetOverHealBonus;
 DynamicDetour detour_CCaptureZone_Capture;
+DynamicDetour detour_CTFRadiusDamageInfo_CalculateFalloff;
 
 Handle hudsync;
 
@@ -122,6 +123,7 @@ public void OnPluginStart() {
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
 	detour_CWeaponMedigun_GetOverHealBonus = DynamicDetour.FromConf(conf, "CWeaponMedigun::GetOverHealBonus");
 	detour_CCaptureZone_Capture = DynamicDetour.FromConf(conf, "CCaptureZone::Capture");
+	detour_CTFRadiusDamageInfo_CalculateFalloff = DynamicDetour.FromConf(conf, "CTFRadiusDamageInfo::CalculateFalloff");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -148,6 +150,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
 	VALIDATE_HANDLE(detour_CWeaponMedigun_GetOverHealBonus);
 	VALIDATE_HANDLE(detour_CCaptureZone_Capture);
+	VALIDATE_HANDLE(detour_CTFRadiusDamageInfo_CalculateFalloff);
 
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
 	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
@@ -156,6 +159,8 @@ public void OnPluginStart() {
 	detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
 	detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
 	detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
+	detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Pre, DHookCallback_Address_Pre);
+	detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_Address_Post);
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
