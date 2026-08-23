@@ -1,7 +1,5 @@
 #include <sourcemod>
-#include <sdktools>
 #include <sdkhooks>
-#include <clientprefs>
 #include <tf2>
 #include <tf2_stocks>
 #include <tf2utils>
@@ -16,7 +14,7 @@
 #define PLUGIN_DESC "Reverts various Mannpower nerfs"
 #define PLUGIN_AUTHOR "haaksirikko"
 #define PLUGIN_VERSION "0.1"
-#define PLUGIN_URL "https://castaway.tf"
+#define PLUGIN_URL ""
 
 enum RuneTypes_t
 {
