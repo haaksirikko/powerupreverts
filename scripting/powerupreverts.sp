@@ -44,6 +44,9 @@ DynamicHook dhook_CCaptureFlag_Drop;
 DynamicHook dhook_CTFGameRules_PlayerKilled;
 DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
 DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
+DynamicHook dhook_CBaseObject_StartBuilding;
+DynamicHook dhook_CBaseObject_CheckUpgradeOnHit;
+DynamicHook dhook_CBaseObject_StartUpgrading;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 
@@ -88,6 +91,9 @@ public void OnPluginStart() {
 	dhook_CTFGameRules_PlayerKilled = DynamicHook.FromConf(conf, "CTFGameRules::PlayerKilled");
 	dhook_CTFGameRules_SetupOnRoundStart = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	dhook_CTFGameRules_SetupOnRoundRunning = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundRunning");
+	dhook_CBaseObject_StartBuilding = DynamicHook.FromConf(conf, "CBaseObject::StartBuilding");
+	dhook_CBaseObject_CheckUpgradeOnHit = DynamicHook.FromConf(conf, "CBaseObject::CheckUpgradeOnHit");
+	dhook_CBaseObject_StartUpgrading = DynamicHook.FromConf(conf, "CBaseObject::StartUpgrading");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
 
@@ -111,6 +117,9 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFGameRules_PlayerKilled);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
+	VALIDATE_HANDLE(dhook_CBaseObject_StartBuilding);
+	VALIDATE_HANDLE(dhook_CBaseObject_CheckUpgradeOnHit);
+	VALIDATE_HANDLE(dhook_CBaseObject_StartUpgrading);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 
@@ -192,42 +201,6 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 	DisablePowerupReverts();
 }
 
-void EnablePowerupReverts() {
-	g_bPowerupRevertsEnabled = sm_powerup_reverts_enable.BoolValue;
-	if (g_bPowerupRevertsEnabled) {
-		ZeroPowerupModeProp(true);
-		ApplyHeavyGrappleJumpBoost(true);
-		LogMessage("Mannpower Reverts enabled");
-	} else {
-		DisablePowerupReverts();
-	}
-}
-
-void DisablePowerupReverts() {
-	g_bPowerupRevertsEnabled = false;
-	ResetPowerupModeProp(true);
-	ApplyHeavyGrappleJumpBoost(false);
-	for (int client = 1; client <= MaxClients; client++) {
-		ClearFreeRide(client);
-	}
-	LogMessage("Mannpower Reverts disabled");
-}
-
-void ApplyHeavyGrappleJumpBoost(bool enable) {
-	if (patch_HeavyGrappleJumpBoost == null) return;
-	if (enable == g_bHeavyGrapplePatchEnabled) return;
-
-	if (enable) {
-		if (patch_HeavyGrappleJumpBoost.Enable()) {
-			g_bHeavyGrapplePatchEnabled = true;
-			LogMessage("Heavy grapple jump boost revert enabled");
-		}
-	} else {
-		patch_HeavyGrappleJumpBoost.Disable();
-		g_bHeavyGrapplePatchEnabled = false;
-	}
-}
-
 int frame;
 public void OnGameFrame() {
 	frame++;
@@ -266,8 +239,6 @@ public void OnGameFrame() {
 				if (second != players[client].last_displayed_second) {
 					players[client].last_displayed_second = second;
 
-					ClearSyncHud(client, hudsync);
-
 					char message[32];
 					Format(message, sizeof(message), "Poison in %ds", second);
 
@@ -277,7 +248,6 @@ public void OnGameFrame() {
 			}
 			else
 			{
-				ClearSyncHud(client, hudsync);
 				players[client].flag = -1;
 				players[client].last_displayed_second = -1;
 			}
@@ -321,6 +291,12 @@ public void OnEntityCreated(int entity, const char[] class) {
 	if (StrContains(class, "obj_") == 0) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
+		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Pre, entity, DHookCallback_EntReturnParams_Pre);
+		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Post, entity, DHookCallback_EntReturnParams_Post);
+		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Pre, entity, DHookCallback_EntReturnParams_Pre);
+		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Post, entity, DHookCallback_EntReturnParams_Post);
+		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Pre, entity, DHookCallback_Ent_Pre);
+		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Post, entity, DHookCallback_Ent_Post);
 	}
 	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle")) == 0) {
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_EntReturn_Pre);
@@ -477,6 +453,15 @@ MRESReturn DHookCallback_EntParams_Post(int entity, DHookParam parameters) {
 	return MRES_Ignored;
 }
 
+MRESReturn DHookCallback_EntReturnParams_Pre(int entity, DHookReturn returnValue, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_EntReturnParams_Post(int entity, DHookReturn returnValue, DHookParam parameters) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+
 MRESReturn DHookCallback_Address_Pre(Address _this) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
@@ -509,6 +494,42 @@ void ZeroPowerupModeProp(bool bypass = false) {
 
 bool IsRevertedPowerupMode() {
 	return tf_powerup_mode.BoolValue && g_bPowerupRevertsEnabled;
+}
+
+void EnablePowerupReverts() {
+	g_bPowerupRevertsEnabled = sm_powerup_reverts_enable.BoolValue;
+	if (g_bPowerupRevertsEnabled) {
+		ZeroPowerupModeProp(true);
+		ApplyHeavyGrappleJumpBoost(true);
+		LogMessage("Mannpower Reverts enabled");
+	} else {
+		DisablePowerupReverts();
+	}
+}
+
+void DisablePowerupReverts() {
+	g_bPowerupRevertsEnabled = false;
+	ResetPowerupModeProp(true);
+	ApplyHeavyGrappleJumpBoost(false);
+	for (int client = 1; client <= MaxClients; client++) {
+		ClearFreeRide(client);
+	}
+	LogMessage("Mannpower Reverts disabled");
+}
+
+void ApplyHeavyGrappleJumpBoost(bool enable) {
+	if (patch_HeavyGrappleJumpBoost == null) return;
+	if (enable == g_bHeavyGrapplePatchEnabled) return;
+
+	if (enable) {
+		if (patch_HeavyGrappleJumpBoost.Enable()) {
+			g_bHeavyGrapplePatchEnabled = true;
+			LogMessage("Heavy grapple jump boost revert enabled");
+		}
+	} else {
+		patch_HeavyGrappleJumpBoost.Disable();
+		g_bHeavyGrapplePatchEnabled = false;
+	}
 }
 
 void ClearFreeRide(int client) {

@@ -73,6 +73,21 @@
 				"linux"		"195"
 				"windows"	"193"
 			}
+			"CBaseObject::StartBuilding"
+			{
+				"linux"		"344"
+				"windows"	"342"
+			}
+			"CBaseObject::CheckUpgradeOnHit"
+			{
+				"linux"		"368"
+				"windows"	"366"
+			}
+			"CBaseObject::StartUpgrading"
+			{
+				"linux"		"385"
+				"windows"	"383"
+			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"
 			{
 				"linux"		"483"
@@ -191,6 +206,41 @@
 				"offset"	"CTFGameRules::SetupOnRoundRunning"
 				"hooktype"	"gamerules"
 				"this"		"address"
+				"return"	"void"
+			}
+			"CBaseObject::StartBuilding"
+			{
+				"offset"	"CBaseObject::StartBuilding"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"bool"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
+					}
+				}
+			}
+			"CBaseObject::CheckUpgradeOnHit"
+			{
+				"offset"	"CBaseObject::CheckUpgradeOnHit"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"bool"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
+					}
+				}
+			}
+			"CBaseObject::StartUpgrading"
+			{
+				"offset"	"CBaseObject::StartUpgrading"
+				"hooktype"	"entity"
+				"this"		"entity"
 				"return"	"void"
 			}
 			"CTFWeaponBaseMelee::DoMeleeDamage"

@@ -7,16 +7,16 @@ capture zone (implemented?)
 buildings
 - increased damage taken from strength, revenge, knockout (implemented)
 - vampire leech (implemented)
-- 1 sec total construction time
-- Level3 skips Level2 anim when redeployed
-- double upgrade rate
+- 1 sec total construction time (implemented)
+- Level3 skips Level2 anim when redeployed (implemented)
+- double upgrade rate (implemented)
 sapper vampire leech
 player
 - uber on spawn (implemented)
 - dropping powerup on disconnect (implemented?)
 - rune regen think (implemented)
 - no dominant state (implemented)
-- undo rage build reductions (implemented?)
+- undo rage build reductions (implemented)
 capture flag (elaborate)
 - flag glow (clientside)
 - standoff (works?)
