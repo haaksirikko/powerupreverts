@@ -28,13 +28,13 @@ gamerules (elaborate)
 - no dominations and revenge (implemented)
 - prevent imbalance team swap (implemented)
 - no dominant state (implemented)
-- CanFlagBeCaptured
-- poisonous flag
-- CalcPlayerScore
-- scout no fall damage (use pbpp instead?)
+- CanFlagBeCaptured (indirectly implemented?)
+- standoff active (indirecly implemented?)
+- CalcPlayerScore (likely not necessary)
+- scout no fall damage (implemented)
 - precision no radius damage falloff (implemented)
 player shared
-- burn damage vampire leech (implemented?)
+- burn damage vampire leech (implemented)
 weapons
 - knife
  - kunai delta health (?)
@@ -69,7 +69,17 @@ heavy grapple jump (implemented)
 medic free ride (implemented)
 medic overheal on powerup (implemented?)
 
+additional nerfs to revert:
+demo nerfs of march 2016
+grapple speed nerfs
+
 tf2 patch notes
+
+* March 29, 2016 Patch
+    Reduced Demoman health bonus when carrying Knockout with a decapitating melee weapon.
+    Reduced Demoman shield charge regen rate when carrying Knockout.
+    Reduced Tide Turner shield charge refill amount on kill when carrying Knockout.
+
 * May 11, 2016 Patch
     Players can no longer change teams in Mannpower Mode.
 

@@ -57,7 +57,6 @@ ConVar tf_powerup_mode;
 ConVar tf_powerup_mode_imbalance_consecutive_min_players;
 ConVar tf_powerup_mode_dominant_multiplier;
 ConVar tf_powerup_mode_killcount_timer_length;
-ConVar tf_weapon_criticals;
 
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
@@ -100,9 +99,10 @@ public void OnPluginStart() {
 	tf_powerup_mode_imbalance_consecutive_min_players = FindConVar("tf_powerup_mode_imbalance_consecutive_min_players");
 	tf_powerup_mode_dominant_multiplier = FindConVar("tf_powerup_mode_dominant_multiplier");
 	tf_powerup_mode_killcount_timer_length = FindConVar("tf_powerup_mode_killcount_timer_length");
-	tf_weapon_criticals = FindConVar("tf_weapon_criticals");
 
 	tf_powerup_mode.AddChangeHook(TogglePowerupReverts);
+
+	HookEvent("post_inventory_application", Event_OnPostInventoryApplication, EventHookMode_Post);
 
 	GameData conf = new GameData("powerupreverts");
 	if (conf == null) SetFailState("Failed to load powerupreverts gamedata");
@@ -286,9 +286,6 @@ public void OnGameFrame() {
 		tf_powerup_mode_dominant_multiplier.IntValue = 999;
 		tf_powerup_mode_killcount_timer_length.IntValue = 999;
 
-		// Disable crits. TODO: add hidden no-crit attribute to all weapons instead
-		tf_weapon_criticals.BoolValue = false;
-
 		ZeroPowerupModeProp();
 	}
 }
@@ -339,6 +336,34 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_EntParams_Pre);
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Drop_Post);
 	}
+}
+
+public Action Event_OnPostInventoryApplication(Event event, const char[] name, bool dontBroadcast) {
+	if (!IsRevertedPowerupMode()) return Plugin_Continue;
+
+	int client = GetClientOfUserId(GetEventInt(event, "userid"));
+
+	if (TF2_GetPlayerClass(client) == TFClass_Scout) {
+		// no fall damage for scout
+		// TODO: make this toggleable
+		TF2Attrib_SetByName(client, "cancel falling damage", 1.0);
+	}
+	else {
+		TF2Attrib_RemoveByName(client, "cancel falling damage");
+	}
+
+	int length = GetEntPropArraySize(client, Prop_Send, "m_hMyWeapons");
+	for (int i = 0; i < length; i++)
+	{
+		int weapon = GetEntPropEnt(client, Prop_Send, "m_hMyWeapons", i);
+		if (weapon != -1)
+		{
+			// disable crits
+			TF2Attrib_SetByName(weapon, "crit mod disabled hidden", 0.0);
+		}
+	}
+	
+	return Plugin_Continue;
 }
 
 // Prevent powerupmode modifiers for damage
