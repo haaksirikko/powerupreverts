@@ -269,7 +269,6 @@ public void OnGameFrame() {
 
 public void OnClientPutInServer(int client) {
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
-	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 }
@@ -323,12 +322,6 @@ Action SDKHookCB_OnTakeDamage(
 ) {
 	ZeroPowerupModeProp();
 	return Plugin_Continue;
-}
-void SDKHookCB_OnTakeDamagePost(
-	int victim, int attacker, int inflictor, float damage, int damage_type,
-	int weapon, float damage_force[3], float damage_position[3], int damage_custom
-) {
-	ZeroPowerupModeProp();
 }
 
 // Building damage
