@@ -59,6 +59,7 @@ ConVar tf_powerup_mode_killcount_timer_length;
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CCaptureFlag_Drop;
+DynamicHook dhook_CTFGameRules_FlPlayerFallDamage;
 DynamicHook dhook_CTFGameRules_PlayerKilled;
 DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
 DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
@@ -100,14 +101,13 @@ public void OnPluginStart() {
 
 	tf_powerup_mode.AddChangeHook(TogglePowerupReverts);
 
-	HookEvent("post_inventory_application", Event_OnPostInventoryApplication, EventHookMode_Post);
-
 	GameData conf = new GameData("powerupreverts");
 	if (conf == null) SetFailState("Failed to load powerupreverts gamedata");
 
 	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
+	dhook_CTFGameRules_FlPlayerFallDamage = DynamicHook.FromConf(conf, "CTFGameRules::FlPlayerFallDamage");
 	dhook_CTFGameRules_PlayerKilled = DynamicHook.FromConf(conf, "CTFGameRules::PlayerKilled");
 	dhook_CTFGameRules_SetupOnRoundStart = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	dhook_CTFGameRules_SetupOnRoundRunning = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundRunning");
@@ -136,6 +136,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
+	VALIDATE_HANDLE(dhook_CTFGameRules_FlPlayerFallDamage);
 	VALIDATE_HANDLE(dhook_CTFGameRules_PlayerKilled);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
@@ -198,6 +199,8 @@ public void OnConfigsExecuted() {
 		g_entMannpowerLogicEntity = ent;
 		EnablePowerupReverts();
 
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
 		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
 		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
 		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
@@ -345,23 +348,6 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_EntParams_Pre);
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Drop_Post);
 	}
-}
-
-public Action Event_OnPostInventoryApplication(Event event, const char[] name, bool dontBroadcast) {
-	if (!IsRevertedPowerupMode()) return Plugin_Continue;
-
-	int client = GetClientOfUserId(GetEventInt(event, "userid"));
-
-	if (TF2_GetPlayerClass(client) == TFClass_Scout) {
-		// no fall damage for scout
-		// TODO: make this toggleable
-		TF2Attrib_SetByName(client, "cancel falling damage", 1.0);
-	}
-	else {
-		TF2Attrib_RemoveByName(client, "cancel falling damage");
-	}
-	
-	return Plugin_Continue;
 }
 
 void SDKHookCB_SpawnPostWeapon(int entity) {
@@ -540,6 +526,15 @@ MRESReturn DHookCallback_AddressParams_Pre(Address _this, DHookParam parameters)
 	return MRES_Ignored;
 }
 MRESReturn DHookCallback_AddressParams_Post(Address _this, DHookParam parameters) {
+	ZeroPowerupModeProp();
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_AddressReturnParams_Pre(Address _this, DHookReturn returnValue, DHookParam parameters) {
+	ResetPowerupModeProp();
+	return MRES_Ignored;
+}
+MRESReturn DHookCallback_AddressReturnParams_Post(Address _this, DHookReturn returnValue, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }

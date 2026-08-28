@@ -72,6 +72,11 @@
 				"linux"		"271"
 				"windows"	"233"
 			}
+			"CTFGameRules::FlPlayerFallDamage"
+			{
+				"linux"		"63"
+				"windows"	"62"
+			}
 			"CTFGameRules::PlayerKilled"
 			{
 				"linux"		"82"
@@ -187,6 +192,20 @@
 					"bMessage"
 					{
 						"type"	"bool"
+					}
+				}
+			}
+			"CTFGameRules::FlPlayerFallDamage"
+			{
+				"offset"	"CTFGameRules::FlPlayerFallDamage"
+				"hooktype"	"gamerules"
+				"this"		"address"
+				"return"	"float"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
 					}
 				}
 			}
