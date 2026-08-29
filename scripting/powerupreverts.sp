@@ -351,6 +351,8 @@ public void OnEntityCreated(int entity, const char[] class) {
 }
 
 void SDKHookCB_SpawnPostWeapon(int entity) {
+	if (!IsRevertedPowerupMode()) return;
+
 	// disable crits
 	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
 }
