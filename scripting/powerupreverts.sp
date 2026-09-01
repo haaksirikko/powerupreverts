@@ -46,9 +46,8 @@ public Plugin myinfo = {
 };
 
 bool g_bPowerupRevertsEnabled;
-int g_entMannpowerLogicEntity = -1;
 
-ConVar sm_powerup_reverts_enable;
+ConVar sm_powerupreverts_enable;
 
 ConVar tf_max_health_boost;
 ConVar tf_powerup_mode;
@@ -90,8 +89,8 @@ Player players[MAXPLAYERS+1];
 public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
 
-	sm_powerup_reverts_enable = CreateConVar("sm_powerup_reverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
-	sm_powerup_reverts_enable.AddChangeHook(TogglePowerupReverts);
+	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
 
 	tf_max_health_boost = FindConVar("tf_max_health_boost");
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
@@ -193,24 +192,16 @@ public void OnConfigsExecuted() {
 		return;
 	}
 
-	int ent = -1;
-	while ((ent = FindEntityByClassname(ent, "tf_logic_mannpower")) != -1) {
-		LogMessage("Detected Mannpower logic entity");
-		g_entMannpowerLogicEntity = ent;
-		EnablePowerupReverts();
+	dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
+	dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
+	dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
+	dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
+	dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+	dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
+	dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+	dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
 
-		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
-		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
-		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
-		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
-		return;
-	}
-
-	DisablePowerupReverts();
+	EnablePowerupReverts();
 }
 
 public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const char[] newValue) {
@@ -221,12 +212,8 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 			return;
 		}
 
-		if (g_entMannpowerLogicEntity != -1) {
-			EnablePowerupReverts();
-			return;
-		} else {
-			LogMessage("No Mannpower logic entity detected");		
-		}
+		EnablePowerupReverts();
+		return;
 	}
 
 	DisablePowerupReverts();
@@ -558,8 +545,11 @@ bool IsRevertedPowerupMode() {
 }
 
 void EnablePowerupReverts() {
-	g_bPowerupRevertsEnabled = sm_powerup_reverts_enable.BoolValue;
-	if (g_bPowerupRevertsEnabled) {
+	g_bPowerupRevertsEnabled = sm_powerupreverts_enable.BoolValue;
+	if (
+		g_bPowerupRevertsEnabled &&
+		tf_powerup_mode.BoolValue
+	) {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
 		LogMessage("Mannpower Reverts enabled");
