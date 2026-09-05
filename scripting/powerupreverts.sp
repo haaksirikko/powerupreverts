@@ -155,29 +155,9 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CTFRadiusDamageInfo_CalculateFalloff);
 	VALIDATE_HANDLE(detour_CObjectSapper_SapperThink);
 
-	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
-	detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
-	detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
-	detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
-	detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
-	detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
-	detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
-	detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Pre, DHookCallback_Address_Pre);
-	detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_Address_Post);
-	detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_Ent_Pre);
-	detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_Ent_Post);
-
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
 		if (IsClientInGame(i)) OnClientPutInServer(i);
-	}
-
-	for (int i = MaxClients + 1; i < 2048; i++) {
-		char class[64];
-		if (IsValidEntity(i)) {
-			GetEntityClassname(i, class, sizeof(class));
-			OnEntityCreated(i, class);
-		}
 	}
 
 	LogMessage(PLUGIN_NAME ... " has loaded.");
@@ -194,15 +174,6 @@ public void OnConfigsExecuted() {
 		DisablePowerupReverts();
 		return;
 	}
-
-	dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
-	dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
-	dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
-	dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
-	dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-	dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
-	dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-	dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
 
 	EnablePowerupReverts();
 }
@@ -224,10 +195,10 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 
 int frame;
 public void OnGameFrame() {
+	if (!IsRevertedPowerupMode()) return;
+
 	frame++;
 	int client;
-
-	if (!IsRevertedPowerupMode()) return;
 
 	for (client = 1; client <= MaxClients; client++) {
 		UpdateFreeRide(client);
@@ -312,7 +283,7 @@ public void OnEntityCreated(int entity, const char[] class) {
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPostWeapon);
 	}
 
-	if (StrContains(class, "obj_") == 0) {
+	if (strncmp(class, "obj_", sizeof("obj_") - 1) == 0) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
 		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Pre, entity, DHookCallback_EntReturnParams_Pre);
@@ -341,12 +312,13 @@ public void OnEntityCreated(int entity, const char[] class) {
 }
 
 void SDKHookCB_SpawnPostWeapon(int entity) {
-	if (!IsRevertedPowerupMode()) return;
+	if (
+		!IsRevertedPowerupMode() ||
+		sm_powerupreverts_crits.BoolValue == true
+	) return;
 
 	// disable crits
-	if (sm_powerupreverts_crits.BoolValue == false) {
-		TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
-	}
+	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
 }
 
 // Prevent powerupmode modifiers for damage
@@ -557,6 +529,28 @@ void EnablePowerupReverts() {
 	) {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
+
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
+
+		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
+		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
+		detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
+		detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
+		detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
+		detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Pre, DHookCallback_Address_Pre);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_Address_Post);
+		detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_Ent_Pre);
+		detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_Ent_Post);
+
 		LogMessage("Mannpower Reverts enabled");
 	} else {
 		DisablePowerupReverts();
@@ -570,6 +564,19 @@ void DisablePowerupReverts() {
 	for (int client = 1; client <= MaxClients; client++) {
 		ClearFreeRide(client);
 	}
+
+	detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_Ent_Pre);
+	detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Post, DHookCallback_Ent_Post);
+	detour_CCaptureFlag_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
+	detour_CCaptureFlag_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
+	detour_CWeaponMedigun_GetOverHealBonus.Disable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
+	detour_CCaptureZone_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
+	detour_CCaptureZone_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
+	detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Pre, DHookCallback_Address_Pre);
+	detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Post, DHookCallback_Address_Post);
+	detour_CObjectSapper_SapperThink.Disable(Hook_Pre, DHookCallback_Ent_Pre);
+	detour_CObjectSapper_SapperThink.Disable(Hook_Post, DHookCallback_Ent_Post);
+
 	LogMessage("Mannpower Reverts disabled");
 }
 
