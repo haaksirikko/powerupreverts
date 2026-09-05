@@ -46,6 +46,7 @@ public Plugin myinfo = {
 };
 
 bool g_bPowerupRevertsEnabled;
+bool g_bDetoursEnabled;
 
 ConVar sm_powerupreverts_enable;
 ConVar sm_powerupreverts_crits;
@@ -154,6 +155,8 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CCaptureZone_Capture);
 	VALIDATE_HANDLE(detour_CTFRadiusDamageInfo_CalculateFalloff);
 	VALIDATE_HANDLE(detour_CObjectSapper_SapperThink);
+
+	g_bDetoursEnabled = false;
 
 	for (int i = 1; i <= MaxClients; i++) {
 		//if (IsClientConnected(i)) OnClientConnected(i);
@@ -551,6 +554,8 @@ void EnablePowerupReverts() {
 		detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_Ent_Pre);
 		detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_Ent_Post);
 
+		g_bDetoursEnabled = true;
+
 		for (int i = MaxClients + 1; i < 2048; i++) {
 			char class[64];
 			if (IsValidEntity(i)) {
@@ -573,17 +578,21 @@ void DisablePowerupReverts() {
 		ClearFreeRide(client);
 	}
 
-	detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_Ent_Pre);
-	detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Post, DHookCallback_Ent_Post);
-	detour_CCaptureFlag_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
-	detour_CCaptureFlag_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
-	detour_CWeaponMedigun_GetOverHealBonus.Disable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
-	detour_CCaptureZone_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
-	detour_CCaptureZone_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
-	detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Pre, DHookCallback_Address_Pre);
-	detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Post, DHookCallback_Address_Post);
-	detour_CObjectSapper_SapperThink.Disable(Hook_Pre, DHookCallback_Ent_Pre);
-	detour_CObjectSapper_SapperThink.Disable(Hook_Post, DHookCallback_Ent_Post);
+	if (g_bDetoursEnabled) {
+		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_Ent_Pre);
+		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Post, DHookCallback_Ent_Post);
+		detour_CCaptureFlag_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
+		detour_CCaptureFlag_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CWeaponMedigun_GetOverHealBonus.Disable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
+		detour_CCaptureZone_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
+		detour_CCaptureZone_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Pre, DHookCallback_Address_Pre);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Post, DHookCallback_Address_Post);
+		detour_CObjectSapper_SapperThink.Disable(Hook_Pre, DHookCallback_Ent_Pre);
+		detour_CObjectSapper_SapperThink.Disable(Hook_Post, DHookCallback_Ent_Post);
+
+		g_bDetoursEnabled = false;
+	}
 
 	LogMessage("Mannpower Reverts disabled");
 }
