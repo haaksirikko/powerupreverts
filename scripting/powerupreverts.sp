@@ -274,7 +274,10 @@ public void OnClientDisconnect_Post(int client) {
 }
 
 public void OnEntityCreated(int entity, const char[] class) {
-	if (entity < 0 || entity >= 2048) return;
+	if (
+		!IsRevertedPowerupMode() ||
+		entity < 0 || entity >= 2048
+	) return;
 
 	if (
 		strncmp(class, "tf_weapon", sizeof("tf_weapon") - 1) == 0 ||
@@ -523,10 +526,7 @@ bool IsRevertedPowerupMode() {
 
 void EnablePowerupReverts() {
 	g_bPowerupRevertsEnabled = sm_powerupreverts_enable.BoolValue;
-	if (
-		g_bPowerupRevertsEnabled &&
-		tf_powerup_mode.BoolValue
-	) {
+	if (IsRevertedPowerupMode()) {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
 
@@ -550,6 +550,14 @@ void EnablePowerupReverts() {
 		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_Address_Post);
 		detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_Ent_Pre);
 		detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_Ent_Post);
+
+		for (int i = MaxClients + 1; i < 2048; i++) {
+			char class[64];
+			if (IsValidEntity(i)) {
+				GetEntityClassname(i, class, sizeof(class));
+				OnEntityCreated(i, class);
+			}
+		}
 
 		LogMessage("Mannpower Reverts enabled");
 	} else {
