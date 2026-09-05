@@ -48,6 +48,7 @@ public Plugin myinfo = {
 bool g_bPowerupRevertsEnabled;
 
 ConVar sm_powerupreverts_enable;
+ConVar sm_powerupreverts_crits;
 
 ConVar tf_max_health_boost;
 ConVar tf_powerup_mode;
@@ -90,6 +91,8 @@ public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
 
 	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Toggle crits in Mannpower", _, true, 0.0, true, 1.0);
+
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
 
 	tf_max_health_boost = FindConVar("tf_max_health_boost");
@@ -341,7 +344,9 @@ void SDKHookCB_SpawnPostWeapon(int entity) {
 	if (!IsRevertedPowerupMode()) return;
 
 	// disable crits
-	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
+	if (sm_powerupreverts_crits.BoolValue == false) {
+		TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
+	}
 }
 
 // Prevent powerupmode modifiers for damage
