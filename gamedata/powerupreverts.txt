@@ -53,6 +53,27 @@
 				"linux"		"@_ZN13CObjectSapper11SapperThinkEv"
 				"windows"	"\x55\x8B\xEC\x83\xEC\x74\x57\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x85\xC0"
 			}
+			// "rocketpack_landed"
+			"CTFPlayerShared::ConditionThink"
+			{
+				"library"	"server"
+				"linux"		"@_ZN15CTFPlayerShared14ConditionThinkEv"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x30\x53\x56\x57\x8B\xD9\xE8"
+			}
+			// "mult_medigun_uberchargerate"
+			"CWeaponMedigun::FindAndHealTargets"
+			{
+				"library"	"server"
+				"linux"		"@_ZN14CWeaponMedigun18FindAndHealTargetsEv"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x20\x53\x56\x8B\xF1\x8B\x8E"
+			}
+			// "Heal Target: ClipSize Data Limit Exceeded: %d (max 500)\n"
+			"CTFPlayer::TFPlayerThink"
+			{
+				"library"	"server"
+				"linux"		"@_ZN9CTFPlayer13TFPlayerThinkEv"
+				"windows"	"\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x2A\x89\x6C\x24\x2A\x8B\xEC\x81\xEC\x58\x02\x00\x00"
+			}
 		}
 
 		"Offsets"
@@ -92,6 +113,11 @@
 				"linux"		"195"
 				"windows"	"193"
 			}
+			"CTFWeaponBase::PrimaryAttack"
+			{
+				"linux"		"293"
+				"windows"	"287"
+			}
 			"CBaseObject::StartBuilding"
 			{
 				"linux"		"344"
@@ -116,6 +142,11 @@
 			{
 				"linux"		"495"
 				"windows"	"488"
+			}
+			"CWeaponMedigun::GetHealRate"
+			{
+				"linux"		"503"
+				"windows"	"496"
 			}
 		}
 
@@ -241,6 +272,13 @@
 				"this"		"address"
 				"return"	"void"
 			}
+			"CTFWeaponBase::PrimaryAttack"
+			{
+				"offset"	"CTFWeaponBase::PrimaryAttack"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+			}
 			"CBaseObject::StartBuilding"
 			{
 				"offset"	"CBaseObject::StartBuilding"
@@ -301,6 +339,13 @@
 			"CTFSniperRifle::GetProjectileDamage"
 			{
 				"offset"	"CTFSniperRifle::GetProjectileDamage"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"float"
+			}
+			"CWeaponMedigun::GetHealRate"
+			{
+				"offset"	"CWeaponMedigun::GetHealRate"
 				"hooktype"	"entity"
 				"this"		"entity"
 				"return"	"float"
@@ -369,6 +414,27 @@
 			"CObjectSapper::SapperThink"
 			{
 				"signature"	"CObjectSapper::SapperThink"
+				"callconv"	"thiscall"
+				"this"		"entity"
+				"return"	"void"
+			}
+			"CTFPlayerShared::ConditionThink"
+			{
+				"signature"	"CTFPlayerShared::ConditionThink"
+				"callconv"	"thiscall"
+				"this"		"address"
+				"return"	"void"
+			}
+			"CWeaponMedigun::FindAndHealTargets"
+			{
+				"signature"	"CWeaponMedigun::FindAndHealTargets"
+				"callconv"	"thiscall"
+				"this"		"entity"
+				"return"	"bool"
+			}
+			"CTFPlayer::TFPlayerThink"
+			{
+				"signature"	"CTFPlayer::TFPlayerThink"
 				"callconv"	"thiscall"
 				"this"		"entity"
 				"return"	"void"

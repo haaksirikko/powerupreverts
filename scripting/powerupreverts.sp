@@ -13,7 +13,7 @@
 #define PLUGIN_NAME "Mannpower Reverts"
 #define PLUGIN_DESC "Reverts various Mannpower nerfs"
 #define PLUGIN_AUTHOR "haaksirikko"
-#define PLUGIN_VERSION "0.2"
+#define PLUGIN_VERSION "0.3"
 #define PLUGIN_URL ""
 
 enum RuneTypes_t
@@ -64,11 +64,13 @@ DynamicHook dhook_CTFGameRules_FlPlayerFallDamage;
 DynamicHook dhook_CTFGameRules_PlayerKilled;
 DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
 DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
+DynamicHook dhook_CTFWeaponBase_PrimaryAttack;
 DynamicHook dhook_CBaseObject_StartBuilding;
 DynamicHook dhook_CBaseObject_CheckUpgradeOnHit;
 DynamicHook dhook_CBaseObject_StartUpgrading;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
+DynamicHook dhook_CWeaponMedigun_GetHealRate;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CCaptureFlag_Capture;
@@ -76,6 +78,9 @@ DynamicDetour detour_CWeaponMedigun_GetOverHealBonus;
 DynamicDetour detour_CCaptureZone_Capture;
 DynamicDetour detour_CTFRadiusDamageInfo_CalculateFalloff;
 DynamicDetour detour_CObjectSapper_SapperThink;
+DynamicDetour detour_CTFPlayerShared_ConditionThink;
+DynamicDetour detour_CWeaponMedigun_FindAndHealTargets;
+DynamicDetour detour_CTFPlayer_TFPlayerThink;
 
 MemoryPatch patch_HeavyGrappleJumpBoost;
 
@@ -91,7 +96,9 @@ Player players[MAXPLAYERS+1];
 public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
 
-	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", "Toggle Mannpower Reverts", _, true, 0.0, true, 1.0);
+	char desc[2048];
+	strcopy(desc, sizeof(desc), "Toggle Mannpower Reverts\n 0: Disable\n 1: Enable, powerup carriers have vanilla penalties\n 2: Enable, powerup carriers have no penalties");
+	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", desc, _, true, 0.0, true, 2.0);
 	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Toggle crits in Mannpower", _, true, 0.0, true, 1.0);
 
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
@@ -119,6 +126,8 @@ public void OnPluginStart() {
 	dhook_CBaseObject_StartUpgrading = DynamicHook.FromConf(conf, "CBaseObject::StartUpgrading");
 	dhook_CTFWeaponBaseMelee_DoMeleeDamage = DynamicHook.FromConf(conf, "CTFWeaponBaseMelee::DoMeleeDamage");
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
+	dhook_CTFWeaponBase_PrimaryAttack = DynamicHook.FromConf(conf, "CTFWeaponBase::PrimaryAttack");
+	dhook_CWeaponMedigun_GetHealRate = DynamicHook.FromConf(conf, "CWeaponMedigun::GetHealRate");
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
@@ -126,6 +135,9 @@ public void OnPluginStart() {
 	detour_CCaptureZone_Capture = DynamicDetour.FromConf(conf, "CCaptureZone::Capture");
 	detour_CTFRadiusDamageInfo_CalculateFalloff = DynamicDetour.FromConf(conf, "CTFRadiusDamageInfo::CalculateFalloff");
 	detour_CObjectSapper_SapperThink = DynamicDetour.FromConf(conf, "CObjectSapper::SapperThink");
+	detour_CTFPlayerShared_ConditionThink = DynamicDetour.FromConf(conf, "CTFPlayerShared::ConditionThink");
+	detour_CWeaponMedigun_FindAndHealTargets = DynamicDetour.FromConf(conf, "CWeaponMedigun::FindAndHealTargets");
+	detour_CTFPlayer_TFPlayerThink = DynamicDetour.FromConf(conf, "CTFPlayer::TFPlayerThink");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -143,11 +155,13 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFGameRules_PlayerKilled);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
+	VALIDATE_HANDLE(dhook_CTFWeaponBase_PrimaryAttack);
 	VALIDATE_HANDLE(dhook_CBaseObject_StartBuilding);
 	VALIDATE_HANDLE(dhook_CBaseObject_CheckUpgradeOnHit);
 	VALIDATE_HANDLE(dhook_CBaseObject_StartUpgrading);
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
+	VALIDATE_HANDLE(dhook_CWeaponMedigun_GetHealRate);
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
@@ -155,6 +169,9 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CCaptureZone_Capture);
 	VALIDATE_HANDLE(detour_CTFRadiusDamageInfo_CalculateFalloff);
 	VALIDATE_HANDLE(detour_CObjectSapper_SapperThink);
+	VALIDATE_HANDLE(detour_CTFPlayerShared_ConditionThink);
+	VALIDATE_HANDLE(detour_CWeaponMedigun_FindAndHealTargets);
+	VALIDATE_HANDLE(detour_CTFPlayer_TFPlayerThink);
 
 	g_bDetoursEnabled = false;
 
@@ -208,8 +225,6 @@ public void OnGameFrame() {
 	}
 
 	if (frame & 6 == 0) {
-		float curtime = GetGameTime();
-
 		for (client = 1; client <= MaxClients; client++) {
 			int flag = players[client].flag;
 
@@ -227,18 +242,15 @@ public void OnGameFrame() {
 				continue;
 			}
 
-			float time = GetEntPropFloat(flag, Prop_Send, "m_flTimeToSetPoisonous") - curtime;
+			float time = GetEntPropFloat(flag, Prop_Send, "m_flTimeToSetPoisonous") - GetGameTime();
 			if (time > 0.0)
 			{
 				int second = RoundToCeil(time);
 				if (second != players[client].last_displayed_second) {
 					players[client].last_displayed_second = second;
 
-					char message[32];
-					Format(message, sizeof(message), "Poison in %ds", second);
-
 					SetHudTextParams(-1.0, 0.925, 1.1, 255, 255, 255, 255, 0, 0.0, 0.0, 0.0);
-					ShowSyncHudText(client, hudsync, message);
+					ShowSyncHudText(client, hudsync, "Poison in %ds", second);
 				}
 			}
 			else
@@ -261,6 +273,7 @@ public void OnGameFrame() {
 
 public void OnClientPutInServer(int client) {
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
+	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 }
@@ -292,27 +305,35 @@ public void OnEntityCreated(int entity, const char[] class) {
 	if (strncmp(class, "obj_", sizeof("obj_") - 1) == 0) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
-		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Pre, entity, DHookCallback_EntReturnParams_Pre);
-		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Post, entity, DHookCallback_EntReturnParams_Post);
-		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Pre, entity, DHookCallback_EntReturnParams_Pre);
-		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Post, entity, DHookCallback_EntReturnParams_Post);
-		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Pre, entity, DHookCallback_Ent_Pre);
-		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Post, entity, DHookCallback_Ent_Post);
+		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Pre, entity, DHookCallback_ThisReturnParams_Pre);
+		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Post, entity, DHookCallback_ThisReturnParams_Post);
+		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Pre, entity, DHookCallback_ThisReturnParams_Pre);
+		dhook_CBaseObject_CheckUpgradeOnHit.HookEntity(Hook_Post, entity, DHookCallback_ThisReturnParams_Post);
+		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Pre, entity, DHookCallback_This_Pre);
+		dhook_CBaseObject_StartUpgrading.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
+	}
+	else if (StrEqual(class, "tf_weapon_medigun")) {
+		dhook_CWeaponMedigun_GetHealRate.HookEntity(Hook_Pre, entity, DHookCallback_CWeaponMedigun_Pre);
+		dhook_CWeaponMedigun_GetHealRate.HookEntity(Hook_Post, entity, DHookCallback_ThisReturn_Post);
 	}
 	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle") - 1) == 0) {
-		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_EntReturn_Pre);
-		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_EntReturn_Post);
+		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_ThisReturn_Pre);
+		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_ThisReturn_Post);
+	}
+	else if (StrEqual(class, "tf_weapon_knife")) {
+		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Pre, entity, DHookCallback_CTFKnife_PrimaryAttack_Pre);
+		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
 	}
 	else if (StrEqual(class, "item_powerup_rune_temp")) {
 		SDKHook(entity, SDKHook_Spawn, SDKHookCB_Spawn);
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
 	}
 	else if (StrEqual(class, "item_teamflag")) {
-		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_Ent_Pre);
-		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_Ent_Post);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_This_Pre);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_PickUp_Pre);
-		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_EntParams_Post);
-		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_EntParams_Pre);
+		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_ThisParams_Post);
+		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_ThisParams_Pre);
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Drop_Post);
 	}
 }
@@ -327,30 +348,46 @@ void SDKHookCB_SpawnPostWeapon(int entity) {
 	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
 }
 
-// Prevent powerupmode modifiers for damage
 Action SDKHookCB_OnTakeDamage(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
+	// Prevent powerupmode modifiers for damage...
 	ZeroPowerupModeProp();
 
-	// Vampire heal on burn damage
-	if (
-		IsRevertedPowerupMode() &&
-		damage_type == (DMG_BURN | DMG_PREVENT_PHYSICS_FORCE) &&
-		victim >= 1 && victim <= MaxClients
-	) {
-		int provider = TF2Util_GetPlayerConditionProvider(victim, TFCond_OnFire);
+	if (IsRevertedPowerupMode()) {
 		if (
-			provider != victim &&
-			provider >= 1 && provider <= MaxClients &&
-			GetCarryingRuneType(provider) == RUNE_VAMPIRE
+			PowerupCarrierPenalties() &&
+			attacker >= 1 && attacker <= MaxClients &&
+			IsCarryingRune(attacker)
 		) {
-			TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);	
+			// ...unless the attacker is carrying a rune
+			ResetPowerupModeProp();
+		}
+
+		// Vampire heal on burn damage
+		if (
+			damage_type == (DMG_BURN | DMG_PREVENT_PHYSICS_FORCE) &&
+			victim >= 1 && victim <= MaxClients
+		) {
+			int provider = TF2Util_GetPlayerConditionProvider(victim, TFCond_OnFire);
+			if (
+				provider != victim &&
+				provider >= 1 && provider <= MaxClients &&
+				GetCarryingRuneType(provider) == RUNE_VAMPIRE
+			) {
+				TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);	
+			}
 		}
 	}
 
 	return Plugin_Continue;
+}
+void SDKHookCB_OnTakeDamagePost(
+	int victim, int attacker, int inflictor, float damage, int damage_type,
+	int weapon, float damage_force[3], float damage_position[3], int damage_custom
+) {
+	ZeroPowerupModeProp();
 }
 
 // Building damage
@@ -379,8 +416,8 @@ void SDKHookCB_SpawnPost(int entity) {
 	if (entity >= 1 && entity <= MaxClients) {
 		int weapon = GetPlayerWeaponSlot(entity, TFWeaponSlot_Melee);
 		if (weapon > 0) {
-			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Pre, weapon, DHookCallback_EntParams_Pre);
-			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Post, weapon, DHookCallback_EntParams_Post);
+			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Pre, weapon, DHookCallback_ThisParams_Pre);
+			dhook_CTFWeaponBaseMelee_DoMeleeDamage.HookEntity(Hook_Post, weapon, DHookCallback_ThisParams_Post);
 		}
 	}
 }
@@ -411,7 +448,10 @@ MRESReturn DHookCallback_CCaptureFlag_Drop_Post(int entity, DHookParam parameter
 }
 
 MRESReturn DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre(int entity, DHookReturn returnValue, DHookParam parameters) {
-	if (IsRevertedPowerupMode()) {
+	if (
+		IsRevertedPowerupMode() &&
+		!PowerupCarrierPenalties()
+	) {
 		float flOverhealBonus = tf_max_health_boost.FloatValue - 1.0;
 		float flMod = 1.0;
 		flMod = TF2Attrib_HookValueFloat(flMod, "mult_medigun_overheal_amount", entity);
@@ -447,84 +487,94 @@ MRESReturn DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre(int entity, DHookR
 	return MRES_Ignored;
 }
 
+MRESReturn DHookCallback_CTFPlayerShared_ConditionThink_Pre(Address _this) {
+	int client = TF2Util_GetPlayerFromSharedAddress(_this);
+	if (
+		IsRevertedPowerupMode() &&
+		PowerupCarrierPenalties() &&
+		client >= 1 && client <= MaxClients &&
+		IsCarryingRune(client)
+	) {
+		ResetPowerupModeProp();	
+	}
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_CTFKnife_PrimaryAttack_Pre(int entity) {
+	int client = GetEntPropEnt(entity, Prop_Send, "m_hOwnerEntity");
+	if (
+		IsRevertedPowerupMode() &&
+		PowerupCarrierPenalties() &&
+		client >= 1 && client <= MaxClients &&
+		IsCarryingRune(client)
+	) {
+		ResetPowerupModeProp();
+	}
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_CWeaponMedigun_Pre(int entity, DHookReturn returnValue) {
+	if (
+		IsRevertedPowerupMode() &&
+		PowerupCarrierPenalties()
+	) {
+		ResetPowerupModeProp();
+	}
+	return MRES_Ignored;
+}
+
 // Generic callbacks so the plugin doesn't get bloated with a bajillion functions that do the same thing
-MRESReturn DHookCallback_Ent_Pre(int client) {
+MRESReturn DHookCallback_This_Pre(int _this) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_Ent_Post(int client) {
+MRESReturn DHookCallback_This_Post(int _this) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
-
-MRESReturn DHookCallback_EntReturn_Pre(int entity, DHookReturn returnValue) {
+MRESReturn DHookCallback_ThisReturn_Pre(int _this, DHookReturn returnValue) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_EntReturn_Post(int entity, DHookReturn returnValue) {
+MRESReturn DHookCallback_ThisReturn_Post(int _this, DHookReturn returnValue) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
-
-MRESReturn DHookCallback_EntParams_Pre(int entity, DHookParam parameters) {
+MRESReturn DHookCallback_ThisParams_Pre(int _this, DHookParam parameters) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_EntParams_Post(int entity, DHookParam parameters) {
+MRESReturn DHookCallback_ThisParams_Post(int _this, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
-
-MRESReturn DHookCallback_EntReturnParams_Pre(int entity, DHookReturn returnValue, DHookParam parameters) {
+MRESReturn DHookCallback_ThisReturnParams_Pre(int _this, DHookReturn returnValue, DHookParam parameters) {
 	ResetPowerupModeProp();
 	return MRES_Ignored;
 }
-MRESReturn DHookCallback_EntReturnParams_Post(int entity, DHookReturn returnValue, DHookParam parameters) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-
-MRESReturn DHookCallback_Address_Pre(Address _this) {
-	ResetPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_Address_Post(Address _this) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-
-MRESReturn DHookCallback_AddressParams_Pre(Address _this, DHookParam parameters) {
-	ResetPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_AddressParams_Post(Address _this, DHookParam parameters) {
-	ZeroPowerupModeProp();
-	return MRES_Ignored;
-}
-
-MRESReturn DHookCallback_AddressReturnParams_Pre(Address _this, DHookReturn returnValue, DHookParam parameters) {
-	ResetPowerupModeProp();
-	return MRES_Ignored;
-}
-MRESReturn DHookCallback_AddressReturnParams_Post(Address _this, DHookReturn returnValue, DHookParam parameters) {
+MRESReturn DHookCallback_ThisReturnParams_Post(int _this, DHookReturn returnValue, DHookParam parameters) {
 	ZeroPowerupModeProp();
 	return MRES_Ignored;
 }
 
 void ResetPowerupModeProp(bool bypass = false) {
-	if (!bypass && g_bPowerupRevertsEnabled == false) return;
-
+	if (!bypass && g_bPowerupRevertsEnabled == false)
+		return;
 	GameRules_SetProp("m_bPowerupMode", tf_powerup_mode.IntValue);
 }
 
 void ZeroPowerupModeProp(bool bypass = false) {
-	if (!bypass && g_bPowerupRevertsEnabled == false) return;
-
+	if (!bypass && g_bPowerupRevertsEnabled == false)
+		return;
 	GameRules_SetProp("m_bPowerupMode", 0);
 }
 
 bool IsRevertedPowerupMode() {
 	return tf_powerup_mode.BoolValue && g_bPowerupRevertsEnabled;
+}
+
+bool PowerupCarrierPenalties() {
+	return sm_powerupreverts_enable.IntValue == 1;
 }
 
 void EnablePowerupReverts() {
@@ -533,26 +583,32 @@ void EnablePowerupReverts() {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
 
-		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_AddressReturnParams_Pre);
-		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_AddressReturnParams_Post);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_AddressParams_Pre);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_AddressParams_Post);
-		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_Address_Post);
-		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_Address_Pre);
-		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_Address_Post);
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_ThisReturnParams_Pre);
+		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_ThisReturnParams_Post);
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_ThisParams_Pre);
+		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_ThisParams_Post);
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_This_Pre);
+		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_This_Post);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_This_Pre);
+		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Post, DHookCallback_This_Post);
 
-		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_Ent_Pre);
-		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_Ent_Post);
-		detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
-		detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFPlayer_StateEnterACTIVE.Enable(Hook_Post, DHookCallback_This_Post);
+		detour_CCaptureFlag_Capture.Enable(Hook_Pre, DHookCallback_ThisParams_Pre);
+		detour_CCaptureFlag_Capture.Enable(Hook_Post, DHookCallback_ThisParams_Post);
 		detour_CWeaponMedigun_GetOverHealBonus.Enable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
-		detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_EntParams_Pre);
-		detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_EntParams_Post);
-		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Pre, DHookCallback_Address_Pre);
-		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_Address_Post);
-		detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_Ent_Pre);
-		detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_Ent_Post);
+		detour_CCaptureZone_Capture.Enable(Hook_Pre, DHookCallback_ThisParams_Pre);
+		detour_CCaptureZone_Capture.Enable(Hook_Post, DHookCallback_ThisParams_Post);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Enable(Hook_Post, DHookCallback_This_Post);
+		detour_CObjectSapper_SapperThink.Enable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CObjectSapper_SapperThink.Enable(Hook_Post, DHookCallback_This_Post);
+		detour_CTFPlayerShared_ConditionThink.Enable(Hook_Pre, DHookCallback_CTFPlayerShared_ConditionThink_Pre);
+		detour_CTFPlayerShared_ConditionThink.Enable(Hook_Post, DHookCallback_This_Post);
+		detour_CWeaponMedigun_FindAndHealTargets.Enable(Hook_Pre, DHookCallback_CWeaponMedigun_Pre);
+		detour_CWeaponMedigun_FindAndHealTargets.Enable(Hook_Post, DHookCallback_ThisReturn_Post);
+		detour_CTFPlayer_TFPlayerThink.Enable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFPlayer_TFPlayerThink.Enable(Hook_Post, DHookCallback_This_Post);
 
 		g_bDetoursEnabled = true;
 
@@ -579,17 +635,23 @@ void DisablePowerupReverts() {
 	}
 
 	if (g_bDetoursEnabled) {
-		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_Ent_Pre);
-		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Post, DHookCallback_Ent_Post);
-		detour_CCaptureFlag_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
-		detour_CCaptureFlag_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
+		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Post, DHookCallback_This_Post);
+		detour_CCaptureFlag_Capture.Disable(Hook_Pre, DHookCallback_ThisParams_Pre);
+		detour_CCaptureFlag_Capture.Disable(Hook_Post, DHookCallback_ThisParams_Post);
 		detour_CWeaponMedigun_GetOverHealBonus.Disable(Hook_Pre, DetourCallback_CWeaponMedigun_GetOverHealBonus_Pre);
-		detour_CCaptureZone_Capture.Disable(Hook_Pre, DHookCallback_EntParams_Pre);
-		detour_CCaptureZone_Capture.Disable(Hook_Post, DHookCallback_EntParams_Post);
-		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Pre, DHookCallback_Address_Pre);
-		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Post, DHookCallback_Address_Post);
-		detour_CObjectSapper_SapperThink.Disable(Hook_Pre, DHookCallback_Ent_Pre);
-		detour_CObjectSapper_SapperThink.Disable(Hook_Post, DHookCallback_Ent_Post);
+		detour_CCaptureZone_Capture.Disable(Hook_Pre, DHookCallback_ThisParams_Pre);
+		detour_CCaptureZone_Capture.Disable(Hook_Post, DHookCallback_ThisParams_Post);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFRadiusDamageInfo_CalculateFalloff.Disable(Hook_Post, DHookCallback_This_Post);
+		detour_CObjectSapper_SapperThink.Disable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CObjectSapper_SapperThink.Disable(Hook_Post, DHookCallback_This_Post);
+		detour_CTFPlayerShared_ConditionThink.Disable(Hook_Pre, DHookCallback_CTFPlayerShared_ConditionThink_Pre);
+		detour_CTFPlayerShared_ConditionThink.Disable(Hook_Post, DHookCallback_This_Post);
+		detour_CWeaponMedigun_FindAndHealTargets.Disable(Hook_Pre, DHookCallback_CWeaponMedigun_Pre);
+		detour_CWeaponMedigun_FindAndHealTargets.Disable(Hook_Post, DHookCallback_ThisReturn_Post);
+		detour_CTFPlayer_TFPlayerThink.Disable(Hook_Pre, DHookCallback_This_Pre);
+		detour_CTFPlayer_TFPlayerThink.Disable(Hook_Post, DHookCallback_This_Post);
 
 		g_bDetoursEnabled = false;
 	}
@@ -692,3 +754,7 @@ static RuneTypes_t GetCarryingRuneType(int client)
     return rune;
 }
 
+bool IsCarryingRune(int client)
+{
+	return GetCarryingRuneType(client) != RUNE_NONE;
+}

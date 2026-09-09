@@ -30,7 +30,7 @@ gamerules (elaborate)
 - no dominant state (implemented)
 - CanFlagBeCaptured (indirectly implemented?)
 - standoff active (indirecly implemented?)
-- CalcPlayerScore (likely not necessary)
+- CalcPlayerScore 5 points per intel cap
 - scout no fall damage (implemented)
 - precision no radius damage falloff (implemented)
 player shared
