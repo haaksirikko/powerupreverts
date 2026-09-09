@@ -50,12 +50,13 @@ bool g_bDetoursEnabled;
 
 ConVar sm_powerupreverts_enable;
 ConVar sm_powerupreverts_crits;
+ConVar sm_powerupreverts_dominant;
+ConVar sm_powerupreverts_imbalance_swap;
 
 ConVar tf_max_health_boost;
 ConVar tf_powerup_mode;
 ConVar tf_powerup_mode_imbalance_consecutive_min_players;
 ConVar tf_powerup_mode_dominant_multiplier;
-ConVar tf_powerup_mode_killcount_timer_length;
 
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
@@ -100,6 +101,8 @@ public void OnPluginStart() {
 	strcopy(desc, sizeof(desc), "Toggle Mannpower Reverts\n 0: Disable\n 1: Enable, powerup carriers have vanilla penalties\n 2: Enable, powerup carriers have no penalties");
 	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", desc, _, true, 0.0, true, 2.0);
 	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Toggle crits in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_dominant = CreateConVar("sm_powerupreverts_dominant", "1", "Toggle dominant state in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_imbalance_swap = CreateConVar("sm_powerupreverts_imbalance_swap", "0", "Toggle imbalance swap in Mannpower", _, true, 0.0, true, 1.0);
 
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
 
@@ -107,7 +110,6 @@ public void OnPluginStart() {
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
 	tf_powerup_mode_imbalance_consecutive_min_players = FindConVar("tf_powerup_mode_imbalance_consecutive_min_players");
 	tf_powerup_mode_dominant_multiplier = FindConVar("tf_powerup_mode_dominant_multiplier");
-	tf_powerup_mode_killcount_timer_length = FindConVar("tf_powerup_mode_killcount_timer_length");
 
 	tf_powerup_mode.AddChangeHook(TogglePowerupReverts);
 
@@ -259,15 +261,6 @@ public void OnGameFrame() {
 				players[client].last_displayed_second = -1;
 			}
 		}
-	}
-
-	if (frame % 66 == 0) {
-		// Set these to high values such that they practically never happen
-		tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
-		tf_powerup_mode_dominant_multiplier.IntValue = 999;
-		tf_powerup_mode_killcount_timer_length.IntValue = 999;
-
-		ZeroPowerupModeProp();
 	}
 }
 
@@ -583,6 +576,9 @@ void EnablePowerupReverts() {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
 
+		if (sm_powerupreverts_dominant.BoolValue == false) tf_powerup_mode_dominant_multiplier.IntValue = 999;
+		if (sm_powerupreverts_imbalance_swap.BoolValue == false) tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_ThisReturnParams_Pre);
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_ThisReturnParams_Post);
 		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_ThisParams_Pre);
@@ -633,6 +629,9 @@ void DisablePowerupReverts() {
 	for (int client = 1; client <= MaxClients; client++) {
 		ClearFreeRide(client);
 	}
+
+	tf_powerup_mode_dominant_multiplier.RestoreDefault();
+	tf_powerup_mode_imbalance_consecutive_min_players.RestoreDefault();
 
 	if (g_bDetoursEnabled) {
 		detour_CTFPlayer_StateEnterACTIVE.Disable(Hook_Pre, DHookCallback_This_Pre);
