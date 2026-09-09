@@ -100,9 +100,9 @@ public void OnPluginStart() {
 	char desc[2048];
 	strcopy(desc, sizeof(desc), "Toggle Mannpower Reverts\n 0: Disable\n 1: Enable, powerup carriers have vanilla penalties\n 2: Enable, powerup carriers have no penalties");
 	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", desc, _, true, 0.0, true, 2.0);
-	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Toggle crits in Mannpower", _, true, 0.0, true, 1.0);
-	sm_powerupreverts_dominant = CreateConVar("sm_powerupreverts_dominant", "1", "Toggle dominant state in Mannpower", _, true, 0.0, true, 1.0);
-	sm_powerupreverts_imbalance_swap = CreateConVar("sm_powerupreverts_imbalance_swap", "0", "Toggle imbalance swap in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Enable crits in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_dominant = CreateConVar("sm_powerupreverts_dominant", "1", "Enable dominant state in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_imbalance_swap = CreateConVar("sm_powerupreverts_imbalance_swap", "0", "Enable imbalance swap in Mannpower", _, true, 0.0, true, 1.0);
 
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
 	sm_powerupreverts_dominant.AddChangeHook(ToggleDominant);

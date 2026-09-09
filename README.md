@@ -12,3 +12,12 @@ Dependencies:
 - [TF2Attributes](https://github.com/FlaminSarge/tf2attributes)
 - [TF2Utils](https://github.com/nosoop/SM-TFUtils)
 - [Source Scramble](https://github.com/nosoop/SMExt-SourceScramble)
+
+ConVars:
+- `sm_powerupreverts_enable` - Enable or disable the plugin. (default: 1)
+  - 0: Disable
+  - 1: Enable, powerup carriers have vanilla penalties
+  - 2: Enable, powerup carriers have no penalties
+- `sm_powerupreverts_crits` - Enable crits in Mannpower (default: 0)
+- `sm_powerupreverts_dominant` - Enable dominant state in Mannpower (default: 1)
+- `sm_powerupreverts_imbalance_swap` - Enable imbalance swap in Mannpower (default: 0)
