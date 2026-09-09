@@ -105,6 +105,8 @@ public void OnPluginStart() {
 	sm_powerupreverts_imbalance_swap = CreateConVar("sm_powerupreverts_imbalance_swap", "0", "Toggle imbalance swap in Mannpower", _, true, 0.0, true, 1.0);
 
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
+	sm_powerupreverts_dominant.AddChangeHook(ToggleDominant);
+	sm_powerupreverts_imbalance_swap.AddChangeHook(ToggleImbalanceSwap);
 
 	tf_max_health_boost = FindConVar("tf_max_health_boost");
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
@@ -213,6 +215,20 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 	}
 
 	DisablePowerupReverts();
+}
+
+public void ToggleDominant(ConVar convar, const char[] oldValue, const char[] newValue) {
+	if (IsRevertedPowerupMode()) {
+		if (convar.BoolValue == false) tf_powerup_mode_dominant_multiplier.IntValue = 999;
+		else tf_powerup_mode_dominant_multiplier.RestoreDefault();
+	}
+}
+
+public void ToggleImbalanceSwap(ConVar convar, const char[] oldValue, const char[] newValue) {
+	if (IsRevertedPowerupMode()) {
+		if (convar.BoolValue == false) tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+		else tf_powerup_mode_imbalance_consecutive_min_players.RestoreDefault();
+	}
 }
 
 int frame;
