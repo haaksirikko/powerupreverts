@@ -58,6 +58,7 @@ ConVar tf_powerup_mode;
 ConVar tf_powerup_mode_imbalance_consecutive_min_players;
 ConVar tf_powerup_mode_dominant_multiplier;
 
+DynamicHook dhook_CAmmoPack_MyTouch;
 DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CCaptureFlag_Drop;
@@ -82,6 +83,7 @@ DynamicDetour detour_CObjectSapper_SapperThink;
 DynamicDetour detour_CTFPlayerShared_ConditionThink;
 DynamicDetour detour_CWeaponMedigun_FindAndHealTargets;
 DynamicDetour detour_CTFPlayer_TFPlayerThink;
+DynamicDetour detour_CTFAmmoPack_PackTouch;
 
 MemoryPatch patch_HeavyGrappleJumpBoost;
 
@@ -118,6 +120,7 @@ public void OnPluginStart() {
 	GameData conf = new GameData("powerupreverts");
 	if (conf == null) SetFailState("Failed to load powerupreverts gamedata");
 
+	dhook_CAmmoPack_MyTouch = DynamicHook.FromConf(conf, "CAmmoPack::MyTouch");
 	dhook_CCaptureFlag_Think = DynamicHook.FromConf(conf, "CCaptureFlag::Think");
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
@@ -142,6 +145,7 @@ public void OnPluginStart() {
 	detour_CTFPlayerShared_ConditionThink = DynamicDetour.FromConf(conf, "CTFPlayerShared::ConditionThink");
 	detour_CWeaponMedigun_FindAndHealTargets = DynamicDetour.FromConf(conf, "CWeaponMedigun::FindAndHealTargets");
 	detour_CTFPlayer_TFPlayerThink = DynamicDetour.FromConf(conf, "CTFPlayer::TFPlayerThink");
+	detour_CTFAmmoPack_PackTouch = DynamicDetour.FromConf(conf, "CTFAmmoPack::PackTouch");
 
 	patch_HeavyGrappleJumpBoost = MemoryPatch.CreateFromConf(conf, "CTFGameMovement::CheckJumpButton_HeavyGrappleJumpBoost");
 	if (patch_HeavyGrappleJumpBoost == null || !patch_HeavyGrappleJumpBoost.Validate()) {
@@ -152,6 +156,7 @@ public void OnPluginStart() {
 
 	#define VALIDATE_HANDLE(%1) if (%1 == null) SetFailState("Failed to hook " ... #%1)
 
+	VALIDATE_HANDLE(dhook_CAmmoPack_MyTouch);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Think);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
@@ -176,6 +181,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(detour_CTFPlayerShared_ConditionThink);
 	VALIDATE_HANDLE(detour_CWeaponMedigun_FindAndHealTargets);
 	VALIDATE_HANDLE(detour_CTFPlayer_TFPlayerThink);
+	VALIDATE_HANDLE(detour_CTFAmmoPack_PackTouch);
 
 	g_bDetoursEnabled = false;
 
@@ -332,6 +338,10 @@ public void OnEntityCreated(int entity, const char[] class) {
 	else if (StrEqual(class, "tf_weapon_knife")) {
 		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Pre, entity, DHookCallback_CTFKnife_PrimaryAttack_Pre);
 		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
+	}
+	else if (strncmp(class, "item_ammopack", sizeof("item_ammopack") - 1) == 0) {
+		dhook_CAmmoPack_MyTouch.HookEntity(Hook_Pre, entity, DHookCallback_CAmmoPack_MyTouch_Pre);
+		dhook_CAmmoPack_MyTouch.HookEntity(Hook_Post, entity, DHookCallback_ThisReturnParams_Post);
 	}
 	else if (StrEqual(class, "item_powerup_rune_temp")) {
 		SDKHook(entity, SDKHook_Spawn, SDKHookCB_Spawn);
@@ -532,6 +542,32 @@ MRESReturn DHookCallback_CWeaponMedigun_Pre(int entity, DHookReturn returnValue)
 	return MRES_Ignored;
 }
 
+MRESReturn DHookCallback_CAmmoPack_MyTouch_Pre(int entity, DHookReturn returnValue, DHookParam parameters) {
+	int client = parameters.Get(1);
+	if (
+		IsRevertedPowerupMode() &&
+		PowerupCarrierPenalties() &&
+		client >= 1 && client <= MaxClients &&
+		IsCarryingRune(client)
+	) {
+		ResetPowerupModeProp();
+	}
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_CTFAmmoPack_PackTouch_Pre(int entity, DHookParam parameters) {
+	int client = parameters.Get(1);
+	if (
+		IsRevertedPowerupMode() &&
+		PowerupCarrierPenalties() &&
+		client >= 1 && client <= MaxClients &&
+		IsCarryingRune(client)
+	) {
+		ResetPowerupModeProp();
+	}
+	return MRES_Ignored;
+}
+
 // Generic callbacks so the plugin doesn't get bloated with a bajillion functions that do the same thing
 MRESReturn DHookCallback_This_Pre(int _this) {
 	ResetPowerupModeProp();
@@ -621,6 +657,8 @@ void EnablePowerupReverts() {
 		detour_CWeaponMedigun_FindAndHealTargets.Enable(Hook_Post, DHookCallback_ThisReturn_Post);
 		detour_CTFPlayer_TFPlayerThink.Enable(Hook_Pre, DHookCallback_This_Pre);
 		detour_CTFPlayer_TFPlayerThink.Enable(Hook_Post, DHookCallback_This_Post);
+		detour_CTFAmmoPack_PackTouch.Enable(Hook_Pre, DHookCallback_CTFAmmoPack_PackTouch_Pre);
+		detour_CTFAmmoPack_PackTouch.Enable(Hook_Post, DHookCallback_ThisParams_Post);
 
 		g_bDetoursEnabled = true;
 
@@ -667,6 +705,8 @@ void DisablePowerupReverts() {
 		detour_CWeaponMedigun_FindAndHealTargets.Disable(Hook_Post, DHookCallback_ThisReturn_Post);
 		detour_CTFPlayer_TFPlayerThink.Disable(Hook_Pre, DHookCallback_This_Pre);
 		detour_CTFPlayer_TFPlayerThink.Disable(Hook_Post, DHookCallback_This_Post);
+		detour_CTFAmmoPack_PackTouch.Disable(Hook_Pre, DHookCallback_CTFAmmoPack_PackTouch_Pre);
+		detour_CTFAmmoPack_PackTouch.Disable(Hook_Post, DHookCallback_ThisParams_Post);
 
 		g_bDetoursEnabled = false;
 	}

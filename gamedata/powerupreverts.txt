@@ -74,10 +74,22 @@
 				"linux"		"@_ZN9CTFPlayer13TFPlayerThinkEv"
 				"windows"	"\x53\x8B\xDC\x83\xEC\x08\x83\xE4\xF0\x83\xC4\x04\x55\x8B\x6B\x2A\x89\x6C\x24\x2A\x8B\xEC\x81\xEC\x58\x02\x00\x00"
 			}
+			// symbol ?PackTouch@CTFAmmoPack@@QAEXPAVCBaseEntity@@@Z, otherwise search string "player_stealsandvich"
+			"CTFAmmoPack::PackTouch"
+			{
+				"library"	"server"
+				"linux"		"@_ZN11CTFAmmoPack9PackTouchEP11CBaseEntity"
+				"windows"	"\x55\x8B\xEC\x83\xEC\x24\x56\x8B\x75\x2A\x57\x8B\xF9\x8B\x46"
+			}
 		}
 
 		"Offsets"
 		{
+			"CAmmoPack::MyTouch"
+			{
+				"linux"		"230"
+				"windows"	"229"
+			}
 			"CCaptureFlag::Think"
 			{
 				"linux"		"50"
@@ -175,6 +187,20 @@
 
 		"Functions"
 		{
+			"CAmmoPack::MyTouch"
+			{
+				"offset"	"CAmmoPack::MyTouch"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"bool"
+				"arguments"
+				{
+					"pPlayer"
+					{
+						"type"	"cbaseentity"
+					}
+				}
+			}
 			"CCaptureFlag::Think"
 			{
 				"offset"	"CCaptureFlag::Think"
@@ -438,6 +464,20 @@
 				"callconv"	"thiscall"
 				"this"		"entity"
 				"return"	"void"
+			}
+			"CTFAmmoPack::PackTouch"
+			{
+				"signature"	"CTFAmmoPack::PackTouch"
+				"callconv"	"thiscall"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"pOther"
+					{
+						"type"	"cbaseentity"
+					}
+				}
 			}
 		}
 	}
