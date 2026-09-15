@@ -63,7 +63,6 @@ DynamicHook dhook_CCaptureFlag_Think;
 DynamicHook dhook_CCaptureFlag_PickUp;
 DynamicHook dhook_CCaptureFlag_Drop;
 DynamicHook dhook_CTFGameRules_FlPlayerFallDamage;
-DynamicHook dhook_CTFGameRules_PlayerKilled;
 DynamicHook dhook_CTFGameRules_SetupOnRoundStart;
 DynamicHook dhook_CTFGameRules_SetupOnRoundRunning;
 DynamicHook dhook_CTFWeaponBase_PrimaryAttack;
@@ -73,6 +72,7 @@ DynamicHook dhook_CBaseObject_StartUpgrading;
 DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 DynamicHook dhook_CWeaponMedigun_GetHealRate;
+DynamicHook dhook_CTFPlayer_EventKilled;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CCaptureFlag_Capture;
@@ -125,7 +125,6 @@ public void OnPluginStart() {
 	dhook_CCaptureFlag_PickUp = DynamicHook.FromConf(conf, "CCaptureFlag::PickUp");
 	dhook_CCaptureFlag_Drop = DynamicHook.FromConf(conf, "CCaptureFlag::Drop");
 	dhook_CTFGameRules_FlPlayerFallDamage = DynamicHook.FromConf(conf, "CTFGameRules::FlPlayerFallDamage");
-	dhook_CTFGameRules_PlayerKilled = DynamicHook.FromConf(conf, "CTFGameRules::PlayerKilled");
 	dhook_CTFGameRules_SetupOnRoundStart = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundStart");
 	dhook_CTFGameRules_SetupOnRoundRunning = DynamicHook.FromConf(conf, "CTFGameRules::SetupOnRoundRunning");
 	dhook_CBaseObject_StartBuilding = DynamicHook.FromConf(conf, "CBaseObject::StartBuilding");
@@ -135,6 +134,7 @@ public void OnPluginStart() {
 	dhook_CTFSniperRifle_GetProjectileDamage = DynamicHook.FromConf(conf, "CTFSniperRifle::GetProjectileDamage");
 	dhook_CTFWeaponBase_PrimaryAttack = DynamicHook.FromConf(conf, "CTFWeaponBase::PrimaryAttack");
 	dhook_CWeaponMedigun_GetHealRate = DynamicHook.FromConf(conf, "CWeaponMedigun::GetHealRate");
+	dhook_CTFPlayer_EventKilled = DynamicHook.FromConf(conf, "CTFPlayer::Event_Killed");
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
@@ -161,7 +161,6 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CCaptureFlag_PickUp);
 	VALIDATE_HANDLE(dhook_CCaptureFlag_Drop);
 	VALIDATE_HANDLE(dhook_CTFGameRules_FlPlayerFallDamage);
-	VALIDATE_HANDLE(dhook_CTFGameRules_PlayerKilled);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundStart);
 	VALIDATE_HANDLE(dhook_CTFGameRules_SetupOnRoundRunning);
 	VALIDATE_HANDLE(dhook_CTFWeaponBase_PrimaryAttack);
@@ -171,6 +170,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFWeaponBaseMelee_DoMeleeDamage);
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 	VALIDATE_HANDLE(dhook_CWeaponMedigun_GetHealRate);
+	VALIDATE_HANDLE(dhook_CTFPlayer_EventKilled);
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
@@ -287,20 +287,28 @@ public void OnGameFrame() {
 }
 
 public void OnClientPutInServer(int client) {
+	if (!IsRevertedPowerupMode()) return;
+
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
 	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
+	dhook_CTFPlayer_EventKilled.HookEntity(Hook_Pre, client, DHookCallback_ThisParams_Pre);
+	dhook_CTFPlayer_EventKilled.HookEntity(Hook_Post, client, DHookCallback_ThisParams_Post);
 }
 
 // Handles rune drop on disconnect
 public void OnClientDisconnect(int client) {
+	if (!IsRevertedPowerupMode()) return;
+
 	ResetPowerupModeProp();
 	ClearFreeRide(client);
 	players[client].flag = -1;
 	players[client].last_displayed_second = -1;
 }
 public void OnClientDisconnect_Post(int client) {
+	if (!IsRevertedPowerupMode()) return;
+
 	ZeroPowerupModeProp();
 }
 
@@ -633,8 +641,6 @@ void EnablePowerupReverts() {
 
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_ThisReturnParams_Pre);
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_ThisReturnParams_Post);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Pre, DHookCallback_ThisParams_Pre);
-		dhook_CTFGameRules_PlayerKilled.HookGamerules(Hook_Post, DHookCallback_ThisParams_Post);
 		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Pre, DHookCallback_This_Pre);
 		dhook_CTFGameRules_SetupOnRoundStart.HookGamerules(Hook_Post, DHookCallback_This_Post);
 		dhook_CTFGameRules_SetupOnRoundRunning.HookGamerules(Hook_Pre, DHookCallback_This_Pre);

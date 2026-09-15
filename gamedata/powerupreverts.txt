@@ -110,11 +110,6 @@
 				"linux"		"63"
 				"windows"	"62"
 			}
-			"CTFGameRules::PlayerKilled"
-			{
-				"linux"		"82"
-				"windows"	"81"
-			}
 			"CTFGameRules::SetupOnRoundStart"
 			{
 				"linux"		"194"
@@ -159,6 +154,11 @@
 			{
 				"linux"		"503"
 				"windows"	"496"
+			}
+			"CTFPlayer::Event_Killed"
+			{
+				"linux"		"69"
+				"windows"	"68"
 			}
 		}
 
@@ -266,24 +266,6 @@
 					}
 				}
 			}
-			"CTFGameRules::PlayerKilled"
-			{
-				"offset"	"CTFGameRules::PlayerKilled"
-				"hooktype"	"gamerules"
-				"this"		"address"
-				"return"	"void"
-				"arguments"
-				{
-					"pVictim"
-					{
-						"type"	"cbaseentity"
-					}
-					"info"
-					{
-						"type"	"int"
-					}
-				}
-			}
 			"CTFGameRules::SetupOnRoundStart"
 			{
 				"offset"	"CTFGameRules::SetupOnRoundStart"
@@ -375,6 +357,20 @@
 				"hooktype"	"entity"
 				"this"		"entity"
 				"return"	"float"
+			}
+			"CTFPlayer::Event_Killed"
+			{
+				"offset"	"CTFPlayer::Event_Killed"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"void"
+				"arguments"
+				{
+					"info"
+					{
+						"type"	"int"
+					}
+				}
 			}
 
 			"CCaptureFlag::Capture"
