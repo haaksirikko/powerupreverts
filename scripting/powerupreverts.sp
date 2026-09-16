@@ -99,8 +99,7 @@ Player players[MAXPLAYERS+1];
 public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
 
-	char desc[2048];
-	strcopy(desc, sizeof(desc), "Toggle Mannpower Reverts\n 0: Disable\n 1: Enable, powerup carriers have vanilla penalties\n 2: Enable, powerup carriers have no penalties");
+	char desc[] = "Toggle Mannpower Reverts\n 0: Disable\n 1: Enable, powerup carriers have vanilla penalties\n 2: Enable, powerup carriers have no penalties";
 	sm_powerupreverts_enable = CreateConVar("sm_powerupreverts_enable", "1", desc, _, true, 0.0, true, 2.0);
 	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Enable crits in Mannpower", _, true, 0.0, true, 1.0);
 	sm_powerupreverts_dominant = CreateConVar("sm_powerupreverts_dominant", "1", "Enable dominant state in Mannpower", _, true, 0.0, true, 1.0);
@@ -636,8 +635,8 @@ void EnablePowerupReverts() {
 		ZeroPowerupModeProp(true);
 		ApplyHeavyGrappleJumpBoost(true);
 
-		if (sm_powerupreverts_dominant.BoolValue == false) tf_powerup_mode_dominant_multiplier.IntValue = 999;
-		if (sm_powerupreverts_imbalance_swap.BoolValue == false) tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+		ToggleDominant(sm_powerupreverts_dominant, "", "");
+		ToggleImbalanceSwap(sm_powerupreverts_imbalance_swap, "", "");
 
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Pre, DHookCallback_ThisReturnParams_Pre);
 		dhook_CTFGameRules_FlPlayerFallDamage.HookGamerules(Hook_Post, DHookCallback_ThisReturnParams_Post);
