@@ -378,10 +378,10 @@ Action SDKHookCB_OnTakeDamage(
 	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
 	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
 ) {
-	// Prevent powerupmode modifiers for damage...
-	ZeroPowerupModeProp();
-
 	if (IsRevertedPowerupMode()) {
+		// Prevent powerupmode modifiers for damage...
+		ZeroPowerupModeProp();
+
 		if (
 			PowerupCarrierPenalties() &&
 			attacker >= 1 && attacker <= MaxClients &&
