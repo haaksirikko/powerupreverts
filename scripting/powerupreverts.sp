@@ -405,6 +405,17 @@ Action SDKHookCB_OnTakeDamage(
 				TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);	
 			}
 		}
+
+		// Strength increases crit damage
+		if (
+			(damage_type | DMG_CRIT) > 0 &&
+			!PowerupCarrierPenalties() &&
+			attacker >= 1 && attacker <= MaxClients &&
+			GetCarryingRuneType(attacker) == RUNE_STRENGTH
+		) {
+			damage *= TF2_IsPlayerInCondition(attacker, TFCond_PowerupModeDominant) ? 1.4 : 2.0;
+			return Plugin_Changed;
+		}
 	}
 
 	return Plugin_Continue;
