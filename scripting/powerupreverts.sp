@@ -408,7 +408,7 @@ Action SDKHookCB_OnTakeDamage(
 
 		// Strength increases crit damage
 		if (
-			(damage_type | DMG_CRIT) > 0 &&
+			(damage_type & DMG_CRIT) > 0 &&
 			!PowerupCarrierPenalties() &&
 			attacker >= 1 && attacker <= MaxClients &&
 			GetCarryingRuneType(attacker) == RUNE_STRENGTH
