@@ -198,23 +198,11 @@ public void OnPluginEnd() {
 }
 
 public void OnConfigsExecuted() {
-	if (GameRules_GetProp("m_bPlayingMannVsMachine")) {
-		LogMessage("Powerup mode is incompatible with MvM");
-		DisablePowerupReverts();
-		return;
-	}
-
 	EnablePowerupReverts();
 }
 
 public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const char[] newValue) {
 	if (convar.BoolValue) {
-		if (GameRules_GetProp("m_bPlayingMannVsMachine")) {
-			LogMessage("Powerup mode is incompatible with MvM");
-			DisablePowerupReverts();
-			return;
-		}
-
 		EnablePowerupReverts();
 		return;
 	}
@@ -641,6 +629,12 @@ bool PowerupCarrierPenalties() {
 }
 
 void EnablePowerupReverts() {
+	if (GameRules_GetProp("m_bPlayingMannVsMachine")) {
+		LogMessage("Powerup mode is incompatible with MvM");
+		DisablePowerupReverts();
+		return;
+	}
+
 	g_bPowerupRevertsEnabled = sm_powerupreverts_enable.BoolValue;
 	if (IsRevertedPowerupMode()) {
 		ZeroPowerupModeProp(true);
