@@ -306,13 +306,13 @@ public void OnEntityCreated(int entity, const char[] class) {
 	) return;
 
 	if (
-		strncmp(class, "tf_weapon", sizeof("tf_weapon") - 1) == 0 ||
-		strncmp(class, "saxxy", sizeof("saxxy") - 1) == 0
+		StrStartsWith(class, "tf_weapon") ||
+		StrStartsWith(class, "saxxy")
 	) {
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPostWeapon);
 	}
 
-	if (strncmp(class, "obj_", sizeof("obj_") - 1) == 0) {
+	if (StrStartsWith(class, "obj_")) {
 		SDKHook(entity, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage_Building);
 		SDKHook(entity, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost_Building);
 		dhook_CBaseObject_StartBuilding.HookEntity(Hook_Pre, entity, DHookCallback_ThisReturnParams_Pre);
@@ -326,7 +326,7 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CWeaponMedigun_GetHealRate.HookEntity(Hook_Pre, entity, DHookCallback_CWeaponMedigun_Pre);
 		dhook_CWeaponMedigun_GetHealRate.HookEntity(Hook_Post, entity, DHookCallback_ThisReturn_Post);
 	}
-	else if (strncmp(class, "tf_weapon_sniperrifle", sizeof("tf_weapon_sniperrifle") - 1) == 0) {
+	else if (StrStartsWith(class, "tf_weapon_sniperrifle")) {
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Pre, entity, DHookCallback_ThisReturn_Pre);
 		dhook_CTFSniperRifle_GetProjectileDamage.HookEntity(Hook_Post, entity, DHookCallback_ThisReturn_Post);
 	}
@@ -334,7 +334,7 @@ public void OnEntityCreated(int entity, const char[] class) {
 		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Pre, entity, DHookCallback_CTFKnife_PrimaryAttack_Pre);
 		dhook_CTFWeaponBase_PrimaryAttack.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
 	}
-	else if (strncmp(class, "item_ammopack", sizeof("item_ammopack") - 1) == 0) {
+	else if (StrStartsWith(class, "item_ammopack")) {
 		dhook_CAmmoPack_MyTouch.HookEntity(Hook_Pre, entity, DHookCallback_CAmmoPack_MyTouch_Pre);
 		dhook_CAmmoPack_MyTouch.HookEntity(Hook_Post, entity, DHookCallback_ThisReturnParams_Post);
 	}
@@ -396,7 +396,7 @@ Action SDKHookCB_OnTakeDamage(
 
 		// Strength increases crit damage
 		if (
-			(damage_type & DMG_CRIT) > 0 &&
+			damage_type & DMG_CRIT &&
 			!PowerupCarrierPenalties() &&
 			attacker >= 1 && attacker <= MaxClients &&
 			GetCarryingRuneType(attacker) == RUNE_STRENGTH
@@ -822,4 +822,8 @@ static RuneTypes_t GetCarryingRuneType(int client)
 bool IsCarryingRune(int client)
 {
 	return GetCarryingRuneType(client) != RUNE_NONE;
+}
+
+stock bool StrStartsWith(const char[] str, const char[] prefix) {
+	return strncmp(str, prefix, strlen(prefix)) == 0;
 }
