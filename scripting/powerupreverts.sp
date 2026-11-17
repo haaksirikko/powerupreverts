@@ -16,6 +16,8 @@
 #define PLUGIN_VERSION "0.3"
 #define PLUGIN_URL ""
 
+#define MAX_ENTITIES 2048
+
 enum RuneTypes_t
 {
 	RUNE_NONE = -1,
@@ -211,22 +213,31 @@ public void TogglePowerupReverts(ConVar convar, const char[] oldValue, const cha
 }
 
 public void ToggleDominant(ConVar convar, const char[] oldValue, const char[] newValue) {
-	if (IsRevertedPowerupMode()) {
-		if (convar.BoolValue == false) tf_powerup_mode_dominant_multiplier.IntValue = 999;
-		else tf_powerup_mode_dominant_multiplier.RestoreDefault();
+	if (!IsRevertedPowerupMode())
+		return;
+
+	if (convar.BoolValue == false) {
+		tf_powerup_mode_dominant_multiplier.IntValue = 999;
+	} else {
+		tf_powerup_mode_dominant_multiplier.RestoreDefault();
 	}
 }
 
 public void ToggleImbalanceSwap(ConVar convar, const char[] oldValue, const char[] newValue) {
-	if (IsRevertedPowerupMode()) {
-		if (convar.BoolValue == false) tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
-		else tf_powerup_mode_imbalance_consecutive_min_players.RestoreDefault();
+	if (!IsRevertedPowerupMode())
+		return;
+
+	if (convar.BoolValue == false) {
+		tf_powerup_mode_imbalance_consecutive_min_players.IntValue = 999;
+	} else {
+		tf_powerup_mode_imbalance_consecutive_min_players.RestoreDefault();
 	}
 }
 
 int frame;
 public void OnGameFrame() {
-	if (!IsRevertedPowerupMode()) return;
+	if (!IsRevertedPowerupMode())
+		return;
 
 	frame++;
 	int client;
@@ -274,9 +285,11 @@ public void OnGameFrame() {
 }
 
 public void OnClientPutInServer(int client) {
-	if (!IsRevertedPowerupMode()) return;
+	if (!IsRevertedPowerupMode())
+		return;
 
 	SDKHook(client, SDKHook_OnTakeDamage, SDKHookCB_OnTakeDamage);
+	SDKHook(client, SDKHook_OnTakeDamageAlive, SDKHookCB_OnTakeDamageAlive);
 	SDKHook(client, SDKHook_OnTakeDamagePost, SDKHookCB_OnTakeDamagePost);
 	SDKHook(client, SDKHook_Spawn, SDKHookCB_Spawn);
 	SDKHook(client, SDKHook_SpawnPost, SDKHookCB_SpawnPost);
@@ -286,7 +299,8 @@ public void OnClientPutInServer(int client) {
 
 // Handles rune drop on disconnect
 public void OnClientDisconnect(int client) {
-	if (!IsRevertedPowerupMode()) return;
+	if (!IsRevertedPowerupMode())
+		return;
 
 	ResetPowerupModeProp();
 	ClearFreeRide(client);
@@ -294,21 +308,17 @@ public void OnClientDisconnect(int client) {
 	players[client].last_displayed_second = -1;
 }
 public void OnClientDisconnect_Post(int client) {
-	if (!IsRevertedPowerupMode()) return;
+	if (!IsRevertedPowerupMode())
+		return;
 
 	ZeroPowerupModeProp();
 }
 
 public void OnEntityCreated(int entity, const char[] class) {
-	if (
-		!IsRevertedPowerupMode() ||
-		entity < 0 || entity >= 2048
-	) return;
+	if (!IsRevertedPowerupMode() || entity < 0 || entity >= MAX_ENTITIES)
+		return;
 
-	if (
-		StrStartsWith(class, "tf_weapon") ||
-		StrStartsWith(class, "saxxy")
-	) {
+	if (IsWeapon(class)) {
 		SDKHook(entity, SDKHook_SpawnPost, SDKHookCB_SpawnPostWeapon);
 	}
 
@@ -353,10 +363,8 @@ public void OnEntityCreated(int entity, const char[] class) {
 }
 
 void SDKHookCB_SpawnPostWeapon(int entity) {
-	if (
-		!IsRevertedPowerupMode() ||
-		sm_powerupreverts_crits.BoolValue == true
-	) return;
+	if (!IsRevertedPowerupMode() || sm_powerupreverts_crits.BoolValue == true)
+		return;
 
 	// disable crits
 	TF2Attrib_SetByName(entity, "crit mod disabled hidden", 0.0);
@@ -379,21 +387,6 @@ Action SDKHookCB_OnTakeDamage(
 			ResetPowerupModeProp();
 		}
 
-		// Vampire heal on burn damage
-		if (
-			damage_type == (DMG_BURN | DMG_PREVENT_PHYSICS_FORCE) &&
-			victim >= 1 && victim <= MaxClients
-		) {
-			int provider = TF2Util_GetPlayerConditionProvider(victim, TFCond_OnFire);
-			if (
-				provider != victim &&
-				provider >= 1 && provider <= MaxClients &&
-				GetCarryingRuneType(provider) == RUNE_VAMPIRE
-			) {
-				TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);	
-			}
-		}
-
 		// Strength increases crit damage
 		if (
 			damage_type & DMG_CRIT &&
@@ -406,6 +399,28 @@ Action SDKHookCB_OnTakeDamage(
 		}
 	}
 
+	return Plugin_Continue;
+}
+Action SDKHookCB_OnTakeDamageAlive(
+	int victim, int& attacker, int& inflictor, float& damage, int& damage_type,
+	int& weapon, float damage_force[3], float damage_position[3], int damage_custom
+) {
+	if (IsRevertedPowerupMode()) {
+		// Vampire heal on burn damage
+		if (
+			damage_type == (DMG_BURN | DMG_PREVENT_PHYSICS_FORCE) &&
+			victim >= 1 && victim <= MaxClients
+		) {
+			int provider = TF2Util_GetPlayerConditionProvider(victim, TFCond_OnFire);
+			if (
+				provider != victim &&
+				provider >= 1 && provider <= MaxClients &&
+				GetCarryingRuneType(provider) == RUNE_VAMPIRE
+			) {
+				TF2Util_TakeHealth(provider, damage, TAKEHEALTH_IGNORE_MAXHEALTH);
+			}
+		}
+	}
 	return Plugin_Continue;
 }
 void SDKHookCB_OnTakeDamagePost(
@@ -520,7 +535,7 @@ MRESReturn DHookCallback_CTFPlayerShared_ConditionThink_Pre(Address _this) {
 		client >= 1 && client <= MaxClients &&
 		IsCarryingRune(client)
 	) {
-		ResetPowerupModeProp();	
+		ResetPowerupModeProp();
 	}
 	return MRES_Ignored;
 }
@@ -611,12 +626,14 @@ MRESReturn DHookCallback_ThisReturnParams_Post(int _this, DHookReturn returnValu
 void ResetPowerupModeProp(bool bypass = false) {
 	if (!bypass && g_bPowerupRevertsEnabled == false)
 		return;
+
 	GameRules_SetProp("m_bPowerupMode", tf_powerup_mode.IntValue);
 }
 
 void ZeroPowerupModeProp(bool bypass = false) {
 	if (!bypass && g_bPowerupRevertsEnabled == false)
 		return;
+
 	GameRules_SetProp("m_bPowerupMode", 0);
 }
 
@@ -672,7 +689,12 @@ void EnablePowerupReverts() {
 
 		g_bDetoursEnabled = true;
 
-		for (int i = MaxClients + 1; i < 2048; i++) {
+		for (int i = 1; i <= MaxClients; i++) {
+			//if (IsClientConnected(i)) OnClientConnected(i);
+			if (IsClientInGame(i)) OnClientPutInServer(i);
+		}
+
+		for (int i = MaxClients + 1; i < MAX_ENTITIES; i++) {
 			char class[64];
 			if (IsValidEntity(i)) {
 				GetEntityClassname(i, class, sizeof(class));
@@ -725,7 +747,8 @@ void DisablePowerupReverts() {
 }
 
 void ApplyHeavyGrappleJumpBoost(bool enable) {
-	if (patch_HeavyGrappleJumpBoost == null) return;
+	if (patch_HeavyGrappleJumpBoost == null)
+		return;
 
 	if (enable) {
 		if (patch_HeavyGrappleJumpBoost.Enable()) {
@@ -733,11 +756,13 @@ void ApplyHeavyGrappleJumpBoost(bool enable) {
 		}
 	} else {
 		patch_HeavyGrappleJumpBoost.Disable();
+		LogMessage("Heavy grapple jump boost revert disabled");
 	}
 }
 
 void ClearFreeRide(int client) {
-	if (players[client].free_ride_patient == 0) return;
+	if (players[client].free_ride_patient == 0)
+		return;
 
 	if (IsClientInGame(client)) {
 		SetEntPropEnt(client, Prop_Send, "m_hGrapplingHookTarget", -1);
@@ -783,9 +808,8 @@ void UpdateFreeRide(int client) {
 	}
 }
 
-TFCond GetConditionFromRuneType(RuneTypes_t rune)
-{
-	switch (rune) { 
+TFCond GetConditionFromRuneType(RuneTypes_t rune) {
+	switch (rune) {
 		case RUNE_NONE:			return view_as<TFCond>(-1);
 		case RUNE_STRENGTH:		return TFCond_RuneStrength;
 		case RUNE_HASTE:		return TFCond_RuneHaste;
@@ -799,19 +823,16 @@ TFCond GetConditionFromRuneType(RuneTypes_t rune)
 		case RUNE_KING:			return TFCond_KingRune;
 		case RUNE_PLAGUE:		return TFCond_PlagueRune;
 		case RUNE_SUPERNOVA:	return TFCond_SupernovaRune;
-		default: LogError("Unexpected rune_type rt (%d) in GetConditionFromRuneType", rune);	
+		default: LogError("Unexpected rune_type rt (%d) in GetConditionFromRuneType", rune);
 	}
 
 	return view_as<TFCond>(-1);
 }
 
-static RuneTypes_t GetCarryingRuneType(int client)
-{
+static RuneTypes_t GetCarryingRuneType(int client) {
     RuneTypes_t rune = RUNE_NONE;
-    for (RuneTypes_t i = view_as<RuneTypes_t>(0); i < RUNE_TYPES_MAX; ++i)
-    {
-        if (TF2_IsPlayerInCondition(client, GetConditionFromRuneType(i)))
-        {
+    for (RuneTypes_t i = view_as<RuneTypes_t>(0); i < RUNE_TYPES_MAX; ++i) {
+        if (TF2_IsPlayerInCondition(client, GetConditionFromRuneType(i))) {
             rune = i;
             break;
         }
@@ -819,11 +840,15 @@ static RuneTypes_t GetCarryingRuneType(int client)
     return rune;
 }
 
-bool IsCarryingRune(int client)
-{
+bool IsCarryingRune(int client) {
 	return GetCarryingRuneType(client) != RUNE_NONE;
 }
 
 stock bool StrStartsWith(const char[] str, const char[] prefix) {
 	return strncmp(str, prefix, strlen(prefix)) == 0;
+}
+
+stock bool IsWeapon(const char[] classname) {
+	return StrStartsWith(classname, "tf_weapon")
+		|| StrStartsWith(classname, "saxxy");
 }
