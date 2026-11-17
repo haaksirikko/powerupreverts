@@ -21,3 +21,4 @@ ConVars:
 - `sm_powerupreverts_crits` - Enable crits in Mannpower (default: 0)
 - `sm_powerupreverts_dominant` - Enable dominant state in Mannpower (default: 1)
 - `sm_powerupreverts_imbalance_swap` - Enable imbalance swap in Mannpower (default: 0)
+- `sm_powerupreverts_powerup_glow` - Restore the per-client Mannpower powerup carrier glow (default: 1)

@@ -17,8 +17,9 @@ player
 - rune regen think (implemented)
 - no dominant state (implemented)
 - undo rage build reductions (implemented)
+- powerup carrier glow (implemented: one tf_glow per observer/carrier, sm_powerupreverts_powerup_glow)
 capture flag (elaborate)
-- flag glow (clientside, look to another implementation perhaps)
+- flag glow (implemented: tf_glow while stolen, engine glow suppressed meanwhile)
 - standoff (works?)
 - flag marked poisonous (implemented)
 - custom capture sound (implemented)
@@ -68,6 +69,30 @@ removed features to re-implement:
 heavy grapple jump (implemented)
 medic free ride (implemented)
 medic overheal on powerup (implemented?)
+
+glow notes:
+- both glows are driven by m_bPowerupMode on the client (flag: CCaptureFlag::ShouldHideGlowEffect,
+  players: C_TFPlayer::ShouldShowPowerupGlowEffect), so zeroing the prop removes them
+- the powerup glow mirrors the client rules: enemy rune carriers below 30% health for observers
+  without a rune, and every non stealthed enemy within 1500 units of a charged Supernova
+- the client rules require the local player to be alive; here dead players and spectators see the
+  glows too, using their spectator target (m_hObserverTarget) as the viewpoint for distance and LOS
+- bots, replay and SourceTV are skipped as observers, so no tf_glow entities are spent on them
+- the Supernova case reads m_flRuneCharge (client side CTFPlayerShared::IsRuneCharged
+  compares it against exactly 100)
+- line of sight is traced server side with MASK_VISIBLE_AND_NPCS, ignoring players and weapons
+- an existing tf_glow of ours cannot be closed per client, so every (observer, carrier) pair
+  gets its own entity that is only transmitted to the observer
+- the stolen flag glow is only transmitted to the team the flag belongs to, because that is the
+  only team CCaptureFlag::ShouldHideGlowEffect blinds while the flag is stolen (everyone else still
+  gets the engine outline), so the two never double up
+- m_bGlowEnabled on the flag must be left alone: ShouldHideGlowEffect starts with !IsGlowEnabled(),
+  and C_TFPlayer::ItemPostFrame uses that same function to hide the *carrier's* glow, so zeroing it
+  silently removes the intel carrier outline as well
+- the carrier outline stays engine driven: ShouldHideGlowEffect hides it from the team that owns the
+  flag, so an enemy carrying your intel has no outline for you (stock CTF) while their team sees it
+  health coloured. Powerup mode shows it to everyone; that is intentionally not restored, so adding
+  it later means a second tf_glow on the carrier (flag owner entity) filtered to the flag's team
 
 additional nerfs to revert:
 demo nerfs of march 2016
