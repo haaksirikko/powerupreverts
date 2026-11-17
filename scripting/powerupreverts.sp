@@ -88,6 +88,7 @@ DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 DynamicHook dhook_CWeaponMedigun_GetHealRate;
 DynamicHook dhook_CTFPlayer_EventKilled;
+DynamicHook dhook_CTFGlow_UpdateTransmitState;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CCaptureFlag_Capture;
@@ -170,6 +171,7 @@ public void OnPluginStart() {
 	dhook_CTFWeaponBase_PrimaryAttack = DynamicHook.FromConf(conf, "CTFWeaponBase::PrimaryAttack");
 	dhook_CWeaponMedigun_GetHealRate = DynamicHook.FromConf(conf, "CWeaponMedigun::GetHealRate");
 	dhook_CTFPlayer_EventKilled = DynamicHook.FromConf(conf, "CTFPlayer::Event_Killed");
+	dhook_CTFGlow_UpdateTransmitState = DynamicHook.FromConf(conf, "CTFGlow::UpdateTransmitState");
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
@@ -206,6 +208,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 	VALIDATE_HANDLE(dhook_CWeaponMedigun_GetHealRate);
 	VALIDATE_HANDLE(dhook_CTFPlayer_EventKilled);
+	VALIDATE_HANDLE(dhook_CTFGlow_UpdateTransmitState);
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
@@ -1013,8 +1016,25 @@ int SpawnGlowEntity(int target, const int color[4], int observer)
 
 	// Entity slots are reused, so the observer is written even for flag glows
 	glow_observer[glow] = observer;
-	SDKHook(glow, SDKHook_SetTransmit, SDKHookCB_GlowTransmit);
+	if (
+		dhook_CTFGlow_UpdateTransmitState.HookEntity(Hook_Pre, glow, DHookCallback_GlowUpdateTransmitState) == INVALID_HOOK_ID ||
+		!SDKHookEx(glow, SDKHook_SetTransmit, SDKHookCB_GlowTransmit)
+	) {
+		LogError("Failed to hook transmission for tf_glow %d", glow);
+		RemoveEntity(glow);
+		return -1;
+	}
+	// Start in full-check mode; FL_EDICT_ALWAYS would bypass SDKHook_SetTransmit.
+	SetEdictFlags(glow, GetEdictFlags(glow) & ~(FL_EDICT_ALWAYS | FL_EDICT_DONTSEND | FL_EDICT_PVSCHECK));
 	return glow;
+}
+
+MRESReturn DHookCallback_GlowUpdateTransmitState(int entity, DHookReturn returnValue)
+{
+	// Avoid PVS culling, but skip the original's SetTransmitState side effect,
+	// which would persist FL_EDICT_ALWAYS and bypass the per-client transmit hook.
+	returnValue.Value = FL_EDICT_ALWAYS;
+	return MRES_Supercede;
 }
 
 public Action SDKHookCB_GlowTransmit(int entity, int client)

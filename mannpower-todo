@@ -83,6 +83,8 @@ glow notes:
 - line of sight is traced server side with MASK_VISIBLE_AND_NPCS, ignoring players and weapons
 - an existing tf_glow of ours cannot be closed per client, so every (observer, carrier) pair
   gets its own entity that is only transmitted to the observer
+- tf_glow normally uses FL_EDICT_ALWAYS, which bypasses SDKHook_SetTransmit; our glows use
+    full transmit checks and override UpdateTransmitState so the per-client filter runs
 - the stolen flag glow is only transmitted to the team the flag belongs to, because that is the
   only team CCaptureFlag::ShouldHideGlowEffect blinds while the flag is stolen (everyone else still
   gets the engine outline), so the two never double up

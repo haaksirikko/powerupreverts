@@ -85,6 +85,11 @@
 
 		"Offsets"
 		{
+			"CTFGlow::UpdateTransmitState"
+			{
+				"linux"		"22"
+				"windows"	"21"
+			}
 			"CAmmoPack::MyTouch"
 			{
 				"linux"		"230"
@@ -187,6 +192,13 @@
 
 		"Functions"
 		{
+			"CTFGlow::UpdateTransmitState"
+			{
+				"offset"	"CTFGlow::UpdateTransmitState"
+				"hooktype"	"entity"
+				"this"		"entity"
+				"return"	"int"
+			}
 			"CAmmoPack::MyTouch"
 			{
 				"offset"	"CAmmoPack::MyTouch"
