@@ -139,8 +139,8 @@ enum struct SharedGlow {
 SharedGlow player_glows[MAXPLAYERS + 1][GLOW_GROUP_COUNT];
 
 enum struct GlowEntity {
+	int target;
 	GlowRoute route;
-	int carrier;
 	GlowGroup group;
 }
 GlowEntity glow_entities[MAX_ENTITIES];
@@ -288,14 +288,14 @@ public void TogglePowerupGlow(ConVar convar, const char[] oldValue, const char[]
 public void OnMapStart() {
 	for (int i = 0; i < MAX_ENTITIES; i++) {
 		ResetFlagGlow(i);
+		glow_entities[i].target = -1;
 		glow_entities[i].route = GLOW_ROUTE_FLAG;
-		glow_entities[i].carrier = 0;
 		glow_entities[i].group = GLOW_GROUP_TEAM;
 	}
 
-	for (int carrier = 1; carrier <= MaxClients; carrier++) {
+	for (int target = 1; target <= MaxClients; target++) {
 		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++) {
-			ResetPlayerGlow(carrier, group);
+			ResetPlayerGlow(target, group);
 		}
 	}
 }
@@ -305,17 +305,17 @@ public void OnEntityDestroyed(int entity) {
 		return;
 
 	// A destroyed glow must not leave stale routing metadata on a reused slot.
-	int carrier = glow_entities[entity].carrier;
+	int target = glow_entities[entity].target;
 	GlowGroup group = glow_entities[entity].group;
 	if (
-		carrier >= 1 && carrier <= MaxClients &&
+		target >= 1 && target <= MaxClients &&
 		group >= GLOW_GROUP_TEAM && group < GLOW_GROUP_COUNT &&
-		player_glows[carrier][group].glow == entity
+		player_glows[target][group].glow == entity
 	) {
-		ResetPlayerGlow(carrier, group);
+		ResetPlayerGlow(target, group);
 	}
+	glow_entities[entity].target = -1;
 	glow_entities[entity].route = GLOW_ROUTE_FLAG;
-	glow_entities[entity].carrier = 0;
 	glow_entities[entity].group = GLOW_GROUP_TEAM;
 
 	if (flag_glows[entity].glow <= 0)
@@ -971,28 +971,28 @@ void ResetFlagGlow(int flag) {
 	flag_glows[flag].enabled = false;
 }
 
-void ResetPlayerGlow(int carrier, GlowGroup group) {
-	player_glows[carrier][group].glow = 0;
-	player_glows[carrier][group].color = 0;
+void ResetPlayerGlow(int target, GlowGroup group) {
+	player_glows[target][group].glow = -1;
+	player_glows[target][group].color = 0;
 	for (int observer = 0; observer <= MaxClients; observer++) {
-		player_glows[carrier][group].recipients[observer] = false;
-		player_glows[carrier][group].desired_recipients[observer] = false;
+		player_glows[target][group].recipients[observer] = false;
+		player_glows[target][group].desired_recipients[observer] = false;
 	}
 }
 
-void DestroyPlayerGlow(int carrier, GlowGroup group) {
-	int glow = player_glows[carrier][group].glow;
+void DestroyPlayerGlow(int target, GlowGroup group) {
+	int glow = player_glows[target][group].glow;
 	if (glow > 0 && IsValidEntity(glow)) {
 		glow_entities[glow].route = GLOW_ROUTE_DESTROYING;
 		RemoveEntity(glow);
 	}
-	ResetPlayerGlow(carrier, group);
+	ResetPlayerGlow(target, group);
 }
 
 void ClearAllPlayerGlows() {
-	for (int carrier = 1; carrier <= MaxClients; carrier++) {
+	for (int target = 1; target <= MaxClients; target++) {
 		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++) {
-			DestroyPlayerGlow(carrier, group);
+			DestroyPlayerGlow(target, group);
 		}
 	}
 }
@@ -1055,7 +1055,7 @@ int SpawnGlowEntity(int target, const int color[4], GlowRoute route, GlowGroup g
 	// Entity slots are reused, so routing metadata is rewritten on every creation.
 	glow_entities[glow].route = route;
 	if (route == GLOW_ROUTE_SHARED_PLAYER) {
-		glow_entities[glow].carrier = target;
+		glow_entities[glow].target = target;
 		glow_entities[glow].group = group;
 	}
 
@@ -1079,25 +1079,26 @@ MRESReturn DHookCallback_GlowUpdateTransmitState(int entity, DHookReturn returnV
 	return MRES_Supercede;
 }
 
-public Action SDKHookCB_GlowTransmit(int entity, int client) {
+public Action SDKHookCB_GlowTransmit(int entity, int recipient) {
 	GlowRoute route = glow_entities[entity].route;
 	if (route == GLOW_ROUTE_SHARED_PLAYER) {
-		int carrier = glow_entities[entity].carrier;
+		int target = glow_entities[entity].target;
 		GlowGroup group = glow_entities[entity].group;
 		if (
-			client < 1 || client > MaxClients ||
-			carrier < 1 || carrier > MaxClients ||
+			recipient < 1 || recipient > MaxClients ||
+			target < 1 || target > MaxClients ||
 			group < GLOW_GROUP_TEAM || group >= GLOW_GROUP_COUNT
 		) {
 			return Plugin_Handled;
 		}
-		return player_glows[carrier][group].recipients[client]
+		return player_glows[target][group].recipients[recipient]
 			? Plugin_Continue
 			: Plugin_Handled;
 	}
-	if (route == GLOW_ROUTE_DESTROYING)
-		return Plugin_Handled;
-	if (route != GLOW_ROUTE_FLAG)
+	else if (
+		route == GLOW_ROUTE_DESTROYING ||
+		route != GLOW_ROUTE_FLAG
+	)
 		return Plugin_Handled;
 
 	// A flag glow stands in for the engine outline, which is hidden only from the
@@ -1106,7 +1107,7 @@ public Action SDKHookCB_GlowTransmit(int entity, int client) {
 	if (flag <= 0)
 		return Plugin_Handled;
 
-	return (GetClientTeam(client) == GetEntProp(flag, Prop_Send, "m_iTeamNum")) ? Plugin_Continue : Plugin_Handled;
+	return (GetClientTeam(recipient) == GetEntProp(flag, Prop_Send, "m_iTeamNum")) ? Plugin_Continue : Plugin_Handled;
 }
 
 // ----------------------------------------------------------------------------
@@ -1131,8 +1132,7 @@ void SetFlagGlowEnabled(int flag, bool enable) {
 		return;
 
 	if (!IsValidEntity(glow)) {
-		flag_glows[flag].glow = 0;
-		flag_glows[flag].enabled = false;
+		ResetFlagGlow(flag);
 		return;
 	}
 
