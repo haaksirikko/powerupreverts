@@ -186,11 +186,6 @@ public void OnPluginStart() {
 
 	g_bDetoursEnabled = false;
 
-	for (int i = 1; i <= MaxClients; i++) {
-		//if (IsClientConnected(i)) OnClientConnected(i);
-		if (IsClientInGame(i)) OnClientPutInServer(i);
-	}
-
 	LogMessage(PLUGIN_NAME ... " has loaded.");
 }
 
