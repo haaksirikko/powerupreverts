@@ -22,18 +22,20 @@
 // Powerup glow updates run every N game frames (~6.6 Hz at 66 tick)
 #define GLOW_REFRESH_INTERVAL 10
 
-// Supernova carriers reveal enemy powerup carriers within this distance (1500 units, squared)
+// Supernova carriers reveal enemies within this distance (1500 units, squared)
 #define GLOW_SUPERNOVA_RADIUS_SQR 2250000.0
 
 // Low health carriers reveal themselves below this health ratio
 #define GLOW_LOW_HEALTH_RATIO 0.3
 
+// Glow groups categorize different types of glow effects, which may have distinct propagation rules and visibility conditions.
 enum GlowGroup {
 	GLOW_GROUP_TEAM,
 	GLOW_GROUP_SUPERNOVA,
 	GLOW_GROUP_COUNT
 };
 
+// Glow routing determines how a glow effect is applied and propagated to observers.
 enum GlowRoute {
 	GLOW_ROUTE_FLAG,
 	GLOW_ROUTE_SHARED_PLAYER,
@@ -996,7 +998,7 @@ void ResetFlagGlow(int flag) {
 }
 
 void ResetPlayerGlow(int target, GlowGroup group) {
-	player_glows[target][group].glow = -1;
+	player_glows[target][group].glow = 0;
 	player_glows[target][group].color = 0;
 	for (int observer = 0; observer <= MaxClients; observer++) {
 		player_glows[target][group].recipients[observer] = false;
@@ -1063,9 +1065,11 @@ int SpawnGlowEntity(int target, const int color[4], GlowRoute route, GlowGroup g
 	char buffer[32];
 	FormatEx(buffer, sizeof(buffer), "%d %d %d %d", color[0], color[1], color[2], color[3]);
 
-	// Player glows are visible-only; flag glows also show through occlusion.
+	// Mode 0 draws both occluded and visible. Mode 2 (visible only) was seen to keep
+	// drawing through walls, so occlusion is handled by the server line of sight
+	// check instead of by the glow mode.
 	DispatchKeyValue(glow, "target", target_name);
-	DispatchKeyValue(glow, "Mode", route == GLOW_ROUTE_FLAG ? "0" : "2");
+	DispatchKeyValue(glow, "Mode", "0");
 	DispatchKeyValue(glow, "StartDisabled", "1");
 	DispatchKeyValue(glow, "GlowColor", buffer);
 	DispatchSpawn(glow);
@@ -1272,10 +1276,14 @@ void SyncPlayerGlowGroup(int carrier, GlowGroup group) {
 
 	int glow = player_glows[carrier][group].glow;
 	if (!has_recipients) {
-		if (glow > 0)
+		if (glow != 0)
 			DestroyPlayerGlow(carrier, group);
 		return;
 	}
+
+	// A failed creation must not be retried every refresh, or it floods the log
+	if (glow < 0)
+		return;
 
 	if (
 		glow > 0 &&
@@ -1294,8 +1302,10 @@ void SyncPlayerGlowGroup(int carrier, GlowGroup group) {
 			DestroyPlayerGlow(carrier, group);
 
 		glow = SpawnGlowEntity(carrier, color, GLOW_ROUTE_SHARED_PLAYER, group);
-		if (glow <= 0)
+		if (glow <= 0) {
+			player_glows[carrier][group].glow = -1;
 			return;
+		}
 
 		player_glows[carrier][group].glow = glow;
 		player_glows[carrier][group].color = packed_color;

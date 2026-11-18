@@ -80,12 +80,16 @@ glow notes:
 - bots, replay and SourceTV are skipped as observers, so no tf_glow entities are spent on them
 - the Supernova case reads m_flRuneCharge (client side CTFPlayerShared::IsRuneCharged
   compares it against exactly 100)
-- player glows use mode 2, so the client renders them only when unobstructed; no server LOS trace
-    is needed
+- every glow uses mode 0 (draw occluded and visible). mode 2 (visible only) still drew through
+    walls in practice, so occlusion is decided by the server line of sight trace instead
+- the line of sight trace is needed for that reason: eligibility alone would reveal a low health
+    rune carrier anywhere on the map. it costs one trace per candidate pair per refresh
 - each carrier uses at most two player-glow entities: one team/health color shared by eligible
     observers without a rune, and one yellow glow shared by eligible charged-Supernova observers
 - a shared glow is destroyed and recreated when its recipient set changes; merely stopping
     transmission would leave its client-side glow attached to the still-visible carrier
+- a creation failure sticks at -1 so it is not retried (and logged) every refresh; it is cleared
+    once the carrier stops qualifying
 - tf_glow normally uses FL_EDICT_ALWAYS, which bypasses SDKHook_SetTransmit; our glows use
     full transmit checks and override UpdateTransmitState so the recipient filter runs
 - the stolen flag glow is only transmitted to the team the flag belongs to, because that is the
