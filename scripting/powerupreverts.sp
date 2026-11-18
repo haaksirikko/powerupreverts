@@ -956,6 +956,30 @@ bool IsCarryingRune(int client) {
 	return GetCarryingRuneType(client) != RUNE_NONE;
 }
 
+bool IsGlowLineOfSightClear(int viewer, int target) {
+	float start[3], end[3];
+	GetClientEyePosition(viewer, start);
+	GetClientEyePosition(target, end);
+
+	Handle trace = TR_TraceRayFilterEx(
+		start, end, MASK_VISIBLE_AND_NPCS, RayType_EndPoint, TraceFilter_GlowLineOfSight
+	);
+	bool clear = !TR_DidHit(trace);
+	delete trace;
+	return clear;
+}
+
+public bool TraceFilter_GlowLineOfSight(int entity, int contentsMask, any data) {
+	if (entity == 0)
+		return true;
+
+	if (entity <= MaxClients)
+		return false;
+
+	char classname[64];
+	return !GetEntityClassname(entity, classname, sizeof(classname)) || !IsWeapon(classname);
+}
+
 // man the following bullshit wouldn't even be necessary if team switching was allowed in mannpower
 
 // ----------------------------------------------------------------------------
@@ -1290,14 +1314,16 @@ void SyncPlayerGlowGroup(int carrier, GlowGroup group) {
 }
 
 void UpdatePowerupGlows() {
-	if (!sm_powerupreverts_powerup_glow.BoolValue) {
-		ClearAllPlayerGlows();
+	if (!sm_powerupreverts_powerup_glow.BoolValue)
 		return;
-	}
 
 	// Build each carrier/color recipient set, then allocate at most one glow for it.
 	bool alive[MAXPLAYERS + 1];
 	bool low_health_rune_carrier[MAXPLAYERS + 1];
+	bool stealthed[MAXPLAYERS + 1];
+	bool stealth_checked[MAXPLAYERS + 1];
+	bool charged_supernova[MAXPLAYERS + 1];
+	RuneTypes_t runes[MAXPLAYERS + 1];
 	int team[MAXPLAYERS + 1];
 	float center[MAXPLAYERS + 1][3];
 
@@ -1306,13 +1332,19 @@ void UpdatePowerupGlows() {
 
 		// Dead players keep their team, so a spectator still filters by it
 		team[client] = IsClientInGame(client) ? GetClientTeam(client) : 0;
+		runes[client] = RUNE_NONE;
+		charged_supernova[client] = false;
+		stealth_checked[client] = false;
 
 		if (!alive[client]) continue;
 
-		if (IsCarryingRune(client)) {
+		runes[client] = GetCarryingRuneType(client);
+		if (runes[client] != RUNE_NONE) {
 			int max_health = TF2Util_GetEntityMaxHealth(client);
 			low_health_rune_carrier[client] = max_health > 0 && (float(GetClientHealth(client)) / float(max_health)) <= GLOW_LOW_HEALTH_RATIO;
 		}
+		charged_supernova[client] = runes[client] == RUNE_SUPERNOVA &&
+			GetEntPropFloat(client, Prop_Send, "m_flRuneCharge") >= 100.0;
 
 		// CBaseEntity::WorldSpaceCenter, used by the client for the distance check
 		float mins[3], maxs[3];
@@ -1351,28 +1383,36 @@ void UpdatePowerupGlows() {
 				continue;
 		}
 
-		RuneTypes_t rune = GetCarryingRuneType(observer);
-		bool supernova_case = rune == RUNE_SUPERNOVA && GetEntPropFloat(observer, Prop_Send, "m_flRuneCharge") >= 100.0;
+		RuneTypes_t rune = runes[observer];
 
 		for (int target = 1; target <= MaxClients; target++) {
 			if (!alive[target] || target == observer || team[target] == team[observer])
 				continue;
 
-			if (rune == RUNE_NONE && low_health_rune_carrier[target]) {
-				player_glows[target][GLOW_GROUP_TEAM].desired_recipients[observer] = true;
-				continue;
-			}
+			bool team_glow = rune == RUNE_NONE && low_health_rune_carrier[target];
+			bool supernova_glow = false;
 
 			// A charged Supernova reveals every nearby enemy that is not stealthed
 			// (TF_COND_STEALTHED, TF_COND_STEALTHED_USER_BUFF, TF_COND_STEALTHED_USER_BUFF_FADING)
 			if (
-				supernova_case &&
-				!TF2_IsPlayerInCondition(target, TFCond_Cloaked) &&
-				!TF2_IsPlayerInCondition(target, TFCond_Stealthed) &&
-				!TF2_IsPlayerInCondition(target, TFCond_StealthedUserBuffFade) &&
+				charged_supernova[observer] &&
 				GetVectorDistance(center[viewer], center[target], true) <= GLOW_SUPERNOVA_RADIUS_SQR
 			) {
-				player_glows[target][GLOW_GROUP_SUPERNOVA].desired_recipients[observer] = true;
+				if (!stealth_checked[target]) {
+					stealthed[target] =
+						TF2_IsPlayerInCondition(target, TFCond_Cloaked) ||
+						TF2_IsPlayerInCondition(target, TFCond_Stealthed) ||
+						TF2_IsPlayerInCondition(target, TFCond_StealthedUserBuffFade);
+					stealth_checked[target] = true;
+				}
+				supernova_glow = !stealthed[target];
+			}
+
+			if ((team_glow || supernova_glow) && IsGlowLineOfSightClear(viewer, target)) {
+				if (team_glow)
+					player_glows[target][GLOW_GROUP_TEAM].desired_recipients[observer] = true;
+				if (supernova_glow)
+					player_glows[target][GLOW_GROUP_SUPERNOVA].desired_recipients[observer] = true;
 			}
 		}
 	}
