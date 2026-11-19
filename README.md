@@ -16,7 +16,8 @@ Dependencies:
 
 Installation:
 
-Copy `powerupreverts.smx` to `addons/sourcemod/plugins/` and `powerupreverts.txt` to
+Download [latest release](https://github.com/haaksirikko/powerupreverts/releases/latest),
+copy `powerupreverts.smx` to `addons/sourcemod/plugins/` and `powerupreverts.txt` to
 `addons/sourcemod/gamedata/`. Release archives ship both files in that layout, so they can be
 extracted straight into the server's `tf/` directory.
 
