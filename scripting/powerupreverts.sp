@@ -1,5 +1,6 @@
 #include <sourcemod>
 #include <sdkhooks>
+#include <sdktools>
 #include <tf2>
 #include <tf2_stocks>
 #include <tf2utils>
@@ -13,10 +14,33 @@
 #define PLUGIN_NAME "Mannpower Reverts"
 #define PLUGIN_DESC "Reverts various Mannpower nerfs"
 #define PLUGIN_AUTHOR "haaksirikko"
-#define PLUGIN_VERSION "0.3"
+#define PLUGIN_VERSION "0.4"
 #define PLUGIN_URL ""
 
 #define MAX_ENTITIES 2048
+
+// Powerup glow updates run every N game frames (~6.6 Hz at 66 tick)
+#define GLOW_REFRESH_INTERVAL 10
+
+// Supernova carriers reveal enemies within this distance (1500 units, squared)
+#define GLOW_SUPERNOVA_RADIUS_SQR 2250000.0
+
+// Low health carriers reveal themselves below this health ratio
+#define GLOW_LOW_HEALTH_RATIO 0.3
+
+// Glow groups categorize different types of glow effects, which may have distinct propagation rules and visibility conditions.
+enum GlowGroup {
+	GLOW_GROUP_TEAM,
+	GLOW_GROUP_SUPERNOVA,
+	GLOW_GROUP_COUNT
+};
+
+// Glow routing determines how a glow effect is applied and propagated to observers.
+enum GlowRoute {
+	GLOW_ROUTE_FLAG,
+	GLOW_ROUTE_SHARED_PLAYER,
+	GLOW_ROUTE_DESTROYING
+};
 
 enum RuneTypes_t
 {
@@ -54,6 +78,7 @@ ConVar sm_powerupreverts_enable;
 ConVar sm_powerupreverts_crits;
 ConVar sm_powerupreverts_dominant;
 ConVar sm_powerupreverts_imbalance_swap;
+ConVar sm_powerupreverts_powerup_glow;
 
 ConVar tf_max_health_boost;
 ConVar tf_powerup_mode;
@@ -75,6 +100,7 @@ DynamicHook dhook_CTFWeaponBaseMelee_DoMeleeDamage;
 DynamicHook dhook_CTFSniperRifle_GetProjectileDamage;
 DynamicHook dhook_CWeaponMedigun_GetHealRate;
 DynamicHook dhook_CTFPlayer_EventKilled;
+DynamicHook dhook_CTFGlow_UpdateTransmitState;
 
 DynamicDetour detour_CTFPlayer_StateEnterACTIVE;
 DynamicDetour detour_CCaptureFlag_Capture;
@@ -98,6 +124,29 @@ enum struct Player {
 }
 Player players[MAXPLAYERS+1];
 
+// Restored Mannpower glow for a stolen intelligence (one tf_glow per flag entity)
+enum struct FlagGlow {
+	int glow;          // tf_glow entity, 0 = not created yet, -1 = creation failed
+	bool enabled;      // whether the glow is currently enabled
+}
+FlagGlow flag_glows[MAX_ENTITIES];
+
+// One glow per carrier and color group, shared by every eligible observer
+enum struct SharedGlow {
+	int glow;
+	int color;
+	bool recipients[MAXPLAYERS + 1];
+	bool desired_recipients[MAXPLAYERS + 1];
+}
+SharedGlow player_glows[MAXPLAYERS + 1][GLOW_GROUP_COUNT];
+
+enum struct GlowEntity {
+	int target;
+	GlowRoute route;
+	GlowGroup group;
+}
+GlowEntity glow_entities[MAX_ENTITIES];
+
 public void OnPluginStart() {
 	hudsync = CreateHudSynchronizer();
 
@@ -106,10 +155,12 @@ public void OnPluginStart() {
 	sm_powerupreverts_crits = CreateConVar("sm_powerupreverts_crits", "0", "Enable crits in Mannpower", _, true, 0.0, true, 1.0);
 	sm_powerupreverts_dominant = CreateConVar("sm_powerupreverts_dominant", "1", "Enable dominant state in Mannpower", _, true, 0.0, true, 1.0);
 	sm_powerupreverts_imbalance_swap = CreateConVar("sm_powerupreverts_imbalance_swap", "0", "Enable imbalance swap in Mannpower", _, true, 0.0, true, 1.0);
+	sm_powerupreverts_powerup_glow = CreateConVar("sm_powerupreverts_powerup_glow", "1", "Restore the per-client Mannpower powerup carrier glow", _, true, 0.0, true, 1.0);
 
 	sm_powerupreverts_enable.AddChangeHook(TogglePowerupReverts);
 	sm_powerupreverts_dominant.AddChangeHook(ToggleDominant);
 	sm_powerupreverts_imbalance_swap.AddChangeHook(ToggleImbalanceSwap);
+	sm_powerupreverts_powerup_glow.AddChangeHook(TogglePowerupGlow);
 
 	tf_max_health_boost = FindConVar("tf_max_health_boost");
 	tf_powerup_mode = FindConVar("tf_powerup_mode");
@@ -136,6 +187,7 @@ public void OnPluginStart() {
 	dhook_CTFWeaponBase_PrimaryAttack = DynamicHook.FromConf(conf, "CTFWeaponBase::PrimaryAttack");
 	dhook_CWeaponMedigun_GetHealRate = DynamicHook.FromConf(conf, "CWeaponMedigun::GetHealRate");
 	dhook_CTFPlayer_EventKilled = DynamicHook.FromConf(conf, "CTFPlayer::Event_Killed");
+	dhook_CTFGlow_UpdateTransmitState = DynamicHook.FromConf(conf, "CTFGlow::UpdateTransmitState");
 
 	detour_CTFPlayer_StateEnterACTIVE = DynamicDetour.FromConf(conf, "CTFPlayer::StateEnterACTIVE");
 	detour_CCaptureFlag_Capture = DynamicDetour.FromConf(conf, "CCaptureFlag::Capture");
@@ -172,6 +224,7 @@ public void OnPluginStart() {
 	VALIDATE_HANDLE(dhook_CTFSniperRifle_GetProjectileDamage);
 	VALIDATE_HANDLE(dhook_CWeaponMedigun_GetHealRate);
 	VALIDATE_HANDLE(dhook_CTFPlayer_EventKilled);
+	VALIDATE_HANDLE(dhook_CTFGlow_UpdateTransmitState);
 
 	VALIDATE_HANDLE(detour_CTFPlayer_StateEnterACTIVE);
 	VALIDATE_HANDLE(detour_CCaptureFlag_Capture);
@@ -229,6 +282,53 @@ public void ToggleImbalanceSwap(ConVar convar, const char[] oldValue, const char
 	}
 }
 
+public void TogglePowerupGlow(ConVar convar, const char[] oldValue, const char[] newValue) {
+	if (!convar.BoolValue)
+		ClearAllPlayerGlows();
+}
+
+public void OnMapStart() {
+	for (int i = 0; i < MAX_ENTITIES; i++) {
+		ResetFlagGlow(i);
+		glow_entities[i].target = -1;
+		glow_entities[i].route = GLOW_ROUTE_FLAG;
+		glow_entities[i].group = GLOW_GROUP_TEAM;
+	}
+
+	for (int target = 1; target <= MaxClients; target++) {
+		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++) {
+			ResetPlayerGlow(target, group);
+		}
+	}
+}
+
+public void OnEntityDestroyed(int entity) {
+	if (entity <= MaxClients || entity >= MAX_ENTITIES)
+		return;
+
+	// A destroyed glow must not leave stale routing metadata on a reused slot.
+	int target = glow_entities[entity].target;
+	GlowGroup group = glow_entities[entity].group;
+	if (
+		target >= 1 && target <= MaxClients &&
+		group >= GLOW_GROUP_TEAM && group < GLOW_GROUP_COUNT &&
+		player_glows[target][group].glow == entity
+	) {
+		ResetPlayerGlow(target, group);
+	}
+	glow_entities[entity].target = -1;
+	glow_entities[entity].route = GLOW_ROUTE_FLAG;
+	glow_entities[entity].group = GLOW_GROUP_TEAM;
+
+	if (flag_glows[entity].glow <= 0)
+		return;
+
+	if (IsValidEntity(flag_glows[entity].glow)) {
+		RemoveEntity(flag_glows[entity].glow);
+	}
+	ResetFlagGlow(entity);
+}
+
 int frame;
 public void OnGameFrame() {
 	if (!IsRevertedPowerupMode())
@@ -239,6 +339,10 @@ public void OnGameFrame() {
 
 	for (client = 1; client <= MaxClients; client++) {
 		UpdateFreeRide(client);
+	}
+
+	if (frame % GLOW_REFRESH_INTERVAL == 0) {
+		UpdatePowerupGlows();
 	}
 
 	if (frame & 6 == 0) {
@@ -299,6 +403,9 @@ public void OnClientDisconnect(int client) {
 
 	ResetPowerupModeProp();
 	ClearFreeRide(client);
+	// Rebuild shared recipient sets after a client slot leaves.
+	ClearAllPlayerGlows();
+
 	players[client].flag = -1;
 	players[client].last_displayed_second = -1;
 }
@@ -349,7 +456,7 @@ public void OnEntityCreated(int entity, const char[] class) {
 	}
 	else if (StrEqual(class, "item_teamflag")) {
 		dhook_CCaptureFlag_Think.HookEntity(Hook_Pre, entity, DHookCallback_This_Pre);
-		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_This_Post);
+		dhook_CCaptureFlag_Think.HookEntity(Hook_Post, entity, DHookCallback_CCaptureFlag_Think_Post);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Pre, entity, DHookCallback_CCaptureFlag_PickUp_Pre);
 		dhook_CCaptureFlag_PickUp.HookEntity(Hook_Post, entity, DHookCallback_ThisParams_Post);
 		dhook_CCaptureFlag_Drop.HookEntity(Hook_Pre, entity, DHookCallback_ThisParams_Pre);
@@ -479,6 +586,12 @@ MRESReturn DHookCallback_CCaptureFlag_Drop_Post(int entity, DHookParam parameter
 		players[client].flag = -1;
 		players[client].last_displayed_second = -1;
 	}
+	return MRES_Ignored;
+}
+
+MRESReturn DHookCallback_CCaptureFlag_Think_Post(int entity) {
+	ZeroPowerupModeProp();
+	SyncFlagGlow(entity);
 	return MRES_Ignored;
 }
 
@@ -694,6 +807,11 @@ void EnablePowerupReverts() {
 			if (IsValidEntity(i)) {
 				GetEntityClassname(i, class, sizeof(class));
 				OnEntityCreated(i, class);
+
+				// Flags are already spawned at this point, so the glow can be set up right away
+				if (StrEqual(class, "item_teamflag")) {
+					SyncFlagGlow(i);
+				}
 			}
 		}
 
@@ -710,6 +828,7 @@ void DisablePowerupReverts() {
 	for (int client = 1; client <= MaxClients; client++) {
 		ClearFreeRide(client);
 	}
+	ClearAllGlows();
 
 	tf_powerup_mode_dominant_multiplier.RestoreDefault();
 	tf_powerup_mode_imbalance_consecutive_min_players.RestoreDefault();
@@ -837,6 +956,481 @@ static RuneTypes_t GetCarryingRuneType(int client) {
 
 bool IsCarryingRune(int client) {
 	return GetCarryingRuneType(client) != RUNE_NONE;
+}
+
+bool IsGlowLineOfSightClear(int viewer, int target) {
+	float start[3], end[3];
+	GetClientEyePosition(viewer, start);
+	GetClientEyePosition(target, end);
+
+	Handle trace = TR_TraceRayFilterEx(
+		start, end, MASK_VISIBLE_AND_NPCS, RayType_EndPoint, TraceFilter_GlowLineOfSight
+	);
+	bool clear = !TR_DidHit(trace);
+	delete trace;
+	return clear;
+}
+
+public bool TraceFilter_GlowLineOfSight(int entity, int contentsMask, any data) {
+	if (entity == 0)
+		return true;
+
+	if (entity <= MaxClients)
+		return false;
+
+	char classname[64];
+	return !GetEntityClassname(entity, classname, sizeof(classname)) || !IsWeapon(classname);
+}
+
+// man the following bullshit wouldn't even be necessary if team switching was allowed in mannpower
+
+// ----------------------------------------------------------------------------
+// Glow support
+//
+// tf_glow state is global, so player glows are shared only when color and the
+// eligible observer set match. A set change recreates the entity to clear old
+// client-side glow objects for observers that are no longer eligible.
+// ----------------------------------------------------------------------------
+
+void ResetFlagGlow(int flag) {
+	flag_glows[flag].glow = 0;
+	flag_glows[flag].enabled = false;
+}
+
+void ResetPlayerGlow(int target, GlowGroup group) {
+	player_glows[target][group].glow = 0;
+	player_glows[target][group].color = 0;
+	for (int observer = 0; observer <= MaxClients; observer++) {
+		player_glows[target][group].recipients[observer] = false;
+		player_glows[target][group].desired_recipients[observer] = false;
+	}
+}
+
+void DestroyPlayerGlow(int target, GlowGroup group) {
+	int glow = player_glows[target][group].glow;
+	if (glow > 0 && IsValidEntity(glow)) {
+		glow_entities[glow].route = GLOW_ROUTE_DESTROYING;
+		RemoveEntity(glow);
+	}
+	ResetPlayerGlow(target, group);
+}
+
+void ClearAllPlayerGlows() {
+	for (int target = 1; target <= MaxClients; target++) {
+		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++) {
+			DestroyPlayerGlow(target, group);
+		}
+	}
+}
+
+int PackColor(const int color[4]) {
+	return color[0] | (color[1] << 8) | (color[2] << 16) | (color[3] << 24);
+}
+
+void GetTeamGlowColor(int team, int color[4]) {
+	switch (view_as<TFTeam>(team)) {
+		case TFTeam_Red: {
+			color[0] = 189; color[1] = 59; color[2] = 59;		// 0.74, 0.23, 0.23
+		}
+		case TFTeam_Blue: {
+			color[0] = 125; color[1] = 168; color[2] = 196;		// 0.49, 0.66, 0.77
+		}
+		default: {
+			color[0] = 194; color[1] = 194; color[2] = 194;		// 0.76, 0.76, 0.76
+		}
+	}
+	color[3] = 255;
+}
+
+int SpawnGlowEntity(int target, const int color[4], GlowRoute route, GlowGroup group = GLOW_GROUP_TEAM) {
+	if (target <= 0 || target >= MAX_ENTITIES)
+		return -1;
+
+	// CTFGlow::Spawn resolves its target by name, so the target is given a name if
+	// it does not have one. The name is left in place to avoid churning the engine
+	// string pool on every glow creation.
+	char target_name[128];
+	GetEntPropString(target, Prop_Data, "m_iName", target_name, sizeof(target_name));
+	if (target_name[0] == '\0') {
+		FormatEx(target_name, sizeof(target_name), "pwrup_glow_%d", target);
+		SetEntPropString(target, Prop_Data, "m_iName", target_name);
+	}
+
+	int glow = CreateEntityByName("tf_glow");
+	if (glow <= 0) {
+		LogError("Failed to create tf_glow for entity %d", target);
+		return -1;
+	}
+
+	char buffer[32];
+	FormatEx(buffer, sizeof(buffer), "%d %d %d %d", color[0], color[1], color[2], color[3]);
+
+	// Mode 0 draws both occluded and visible. Mode 2 (visible only) was seen to keep
+	// drawing through walls, so occlusion is handled by the server line of sight
+	// check instead of by the glow mode.
+	DispatchKeyValue(glow, "target", target_name);
+	DispatchKeyValue(glow, "Mode", "0");
+	DispatchKeyValue(glow, "StartDisabled", "1");
+	DispatchKeyValue(glow, "GlowColor", buffer);
+	DispatchSpawn(glow);
+
+	// CTFGlow removes itself when its target cannot be found
+	if (!IsValidEntity(glow) || GetEntPropEnt(glow, Prop_Send, "m_hTarget") != target) {
+		LogError("tf_glow failed to target entity %d", target);
+		return -1;
+	}
+
+	// Entity slots are reused, so routing metadata is rewritten on every creation.
+	glow_entities[glow].route = route;
+	if (route == GLOW_ROUTE_SHARED_PLAYER) {
+		glow_entities[glow].target = target;
+		glow_entities[glow].group = group;
+	}
+
+	if (
+		dhook_CTFGlow_UpdateTransmitState.HookEntity(Hook_Pre, glow, DHookCallback_GlowUpdateTransmitState) == INVALID_HOOK_ID ||
+		!SDKHookEx(glow, SDKHook_SetTransmit, SDKHookCB_GlowTransmit)
+	) {
+		LogError("Failed to hook transmission for tf_glow %d", glow);
+		RemoveEntity(glow);
+		return -1;
+	}
+	// Start in full-check mode; FL_EDICT_ALWAYS would bypass SDKHook_SetTransmit.
+	SetEdictFlags(glow, GetEdictFlags(glow) & ~(FL_EDICT_ALWAYS | FL_EDICT_DONTSEND | FL_EDICT_PVSCHECK));
+	return glow;
+}
+
+MRESReturn DHookCallback_GlowUpdateTransmitState(int entity, DHookReturn returnValue) {
+	// Avoid PVS culling, but skip the original's SetTransmitState side effect,
+	// which would persist FL_EDICT_ALWAYS and bypass the per-client transmit hook.
+	returnValue.Value = FL_EDICT_ALWAYS;
+	return MRES_Supercede;
+}
+
+public Action SDKHookCB_GlowTransmit(int entity, int recipient) {
+	GlowRoute route = glow_entities[entity].route;
+	if (route == GLOW_ROUTE_SHARED_PLAYER) {
+		int target = glow_entities[entity].target;
+		GlowGroup group = glow_entities[entity].group;
+		if (
+			recipient < 1 || recipient > MaxClients ||
+			target < 1 || target > MaxClients ||
+			group < GLOW_GROUP_TEAM || group >= GLOW_GROUP_COUNT
+		) {
+			return Plugin_Handled;
+		}
+		return player_glows[target][group].recipients[recipient]
+			? Plugin_Continue
+			: Plugin_Handled;
+	}
+	else if (
+		route == GLOW_ROUTE_DESTROYING ||
+		route != GLOW_ROUTE_FLAG
+	)
+		return Plugin_Handled;
+
+	// A flag glow stands in for the engine outline, which is hidden only from the
+	// team the flag belongs to (CCaptureFlag::ShouldHideGlowEffect)
+	int flag = GetEntPropEnt(entity, Prop_Send, "m_hTarget");
+	if (flag <= 0)
+		return Plugin_Handled;
+
+	return (GetClientTeam(recipient) == GetEntProp(flag, Prop_Send, "m_iTeamNum")) ? Plugin_Continue : Plugin_Handled;
+}
+
+// ----------------------------------------------------------------------------
+// Flag glow
+//
+// In powerup mode CCaptureFlag::ShouldHideGlowEffect never hides the outline,
+// so a stolen intelligence keeps glowing for the team that owns it. Reverting
+// powerup mode removes that behaviour, so it is restored here with a tf_glow
+// that is enabled while the flag is stolen. The engine outline is hidden from
+// the owning team only while the flag is stolen, so this glow is transmitted to
+// that team alone and never doubles up the engine's own outline.
+//
+// The carrier's own outline is left entirely to the engine: ItemPostFrame feeds
+// ShouldHideGlowEffect to the player glow object, so an enemy carrying your intel
+// has no outline for you (stock CTF) while their own team sees it health coloured.
+// Powerup mode shows it to everyone, but that is deliberately not restored.
+// ----------------------------------------------------------------------------
+
+void SetFlagGlowEnabled(int flag, bool enable) {
+	int glow = flag_glows[flag].glow;
+	if (glow <= 0 || flag_glows[flag].enabled == enable)
+		return;
+
+	if (!IsValidEntity(glow)) {
+		ResetFlagGlow(flag);
+		return;
+	}
+
+	AcceptEntityInput(glow, enable ? "Enable" : "Disable");
+	flag_glows[flag].enabled = enable;
+}
+
+void SyncFlagGlow(int flag) {
+	if (!IsRevertedPowerupMode() || flag <= 0 || flag >= MAX_ENTITIES || !IsValidEntity(flag))
+		return;
+
+	// TF_FLAGINFO_STOLEN, and honour maps and plugins that disabled the glow
+	// entirely (ForceGlowDisabled zeroes m_bGlowEnabled)
+	if (
+		(GetEntProp(flag, Prop_Send, "m_nFlagStatus") & 1) == 0 ||
+		GetEntProp(flag, Prop_Send, "m_bGlowEnabled") == 0
+	) {
+		SetFlagGlowEnabled(flag, false);
+		return;
+	}
+
+	// m_bGlowEnabled is deliberately left alone: it also decides whether the flag
+	// carrier's own outline is drawn (CCaptureFlag::ShouldHideGlowEffect is used
+	// for both, so zeroing it kills the carrier glow)
+	if (flag_glows[flag].glow == 0) {
+		int color[4];
+		GetTeamGlowColor(GetEntProp(flag, Prop_Send, "m_iTeamNum"), color);
+		flag_glows[flag].glow = SpawnGlowEntity(flag, color, GLOW_ROUTE_FLAG);
+	}
+
+	if (flag_glows[flag].glow > 0)
+		SetFlagGlowEnabled(flag, true);
+}
+
+// ----------------------------------------------------------------------------
+// Powerup carrier glow eligibility
+//
+// Mirrors C_TFPlayer::ShouldShowPowerupGlowEffect: enemies carrying a rune glow
+// for observers without a rune when below 30% health, and a charged Supernova
+// reveals nearby enemies within 1500 units. Mode 2 handles wall occlusion on
+// the client. Dead players and spectators use their spectator target's position.
+// ----------------------------------------------------------------------------
+
+void GetPowerupGlowColor(RuneTypes_t observer_rune, int carrier, int color[4]) {
+	// C_TFPlayer::GetPowerupGlowEffectColor
+	if (observer_rune == RUNE_SUPERNOVA) {
+		color[0] = 255; color[1] = 255; color[2] = 0; color[3] = 255;
+		return;
+	}
+
+	// C_TFPlayer::GetGlowEffectColor: CTFPlayer::HasTheFlag makes intel carriers use a health colour
+	int item = GetEntPropEnt(carrier, Prop_Send, "m_hItem");
+	char item_class[32];
+	if (
+		item > 0 && item < MAX_ENTITIES &&
+		GetEntityClassname(item, item_class, sizeof(item_class)) &&
+		StrEqual(item_class, "item_teamflag")
+	) {
+		int max_health = TF2Util_GetEntityMaxHealth(carrier);
+		float health = (max_health > 0) ? (float(GetClientHealth(carrier)) / float(max_health)) : 1.0;
+
+		if (health > 0.6) {
+			color[0] = 84; color[1] = 191; color[2] = 59;
+		}
+		else if (health > 0.3) {
+			color[0] = 191; color[1] = 184; color[2] = 59;
+		}
+		else {
+			color[0] = 191; color[1] = 59; color[2] = 59;
+		}
+		color[3] = 255;
+		return;
+	}
+
+	int team = GetClientTeam(carrier);
+
+	// Disguised spies glow with their disguise colour, like on the client
+	if (
+		TF2_GetPlayerClass(carrier) == TFClass_Spy &&
+		TF2_IsPlayerInCondition(carrier, TFCond_Disguised)
+	) {
+		TFTeam disguise_team = view_as<TFTeam>(GetEntProp(carrier, Prop_Send, "m_nDisguiseTeam"));
+		if (disguise_team >= TFTeam_Red && disguise_team <= TFTeam_Blue)
+		{
+			team = view_as<int>(disguise_team);
+		}
+	}
+
+	GetTeamGlowColor(team, color);
+}
+
+void ClearAllGlows() {
+	for (int i = 1; i < MAX_ENTITIES; i++) {
+		int glow = flag_glows[i].glow;
+		if (glow > 0 && IsValidEntity(glow))
+			RemoveEntity(glow);
+
+		ResetFlagGlow(i);
+	}
+
+	ClearAllPlayerGlows();
+}
+
+void SyncPlayerGlowGroup(int carrier, GlowGroup group) {
+	bool has_recipients = false;
+	bool recipients_changed = false;
+	for (int observer = 1; observer <= MaxClients; observer++) {
+		bool desired = player_glows[carrier][group].desired_recipients[observer];
+		has_recipients = has_recipients || desired;
+		if (player_glows[carrier][group].recipients[observer] != desired)
+			recipients_changed = true;
+	}
+
+	int glow = player_glows[carrier][group].glow;
+	if (!has_recipients) {
+		if (glow != 0)
+			DestroyPlayerGlow(carrier, group);
+		return;
+	}
+
+	// A failed creation must not be retried every refresh, or it floods the log
+	if (glow < 0)
+		return;
+
+	if (
+		glow > 0 &&
+		(!IsValidEntity(glow) || GetEntPropEnt(glow, Prop_Send, "m_hTarget") != carrier)
+	) {
+		DestroyPlayerGlow(carrier, group);
+		glow = 0;
+		recipients_changed = true;
+	}
+
+	int color[4];
+	GetPowerupGlowColor(group == GLOW_GROUP_SUPERNOVA ? RUNE_SUPERNOVA : RUNE_NONE, carrier, color);
+	int packed_color = PackColor(color);
+	if (glow == 0 || recipients_changed) {
+		if (glow > 0)
+			DestroyPlayerGlow(carrier, group);
+
+		glow = SpawnGlowEntity(carrier, color, GLOW_ROUTE_SHARED_PLAYER, group);
+		if (glow <= 0) {
+			player_glows[carrier][group].glow = -1;
+			return;
+		}
+
+		player_glows[carrier][group].glow = glow;
+		player_glows[carrier][group].color = packed_color;
+		for (int observer = 1; observer <= MaxClients; observer++) {
+			player_glows[carrier][group].recipients[observer] = player_glows[carrier][group].desired_recipients[observer];
+		}
+		AcceptEntityInput(glow, "Enable");
+		return;
+	}
+
+	if (packed_color != player_glows[carrier][group].color) {
+		player_glows[carrier][group].color = packed_color;
+		SetVariantColor(color);
+		AcceptEntityInput(glow, "SetGlowColor");
+	}
+}
+
+void UpdatePowerupGlows() {
+	if (!sm_powerupreverts_powerup_glow.BoolValue)
+		return;
+
+	// Build each carrier/color recipient set, then allocate at most one glow for it.
+	bool alive[MAXPLAYERS + 1];
+	bool low_health_rune_carrier[MAXPLAYERS + 1];
+	bool stealthed[MAXPLAYERS + 1];
+	bool stealth_checked[MAXPLAYERS + 1];
+	bool charged_supernova[MAXPLAYERS + 1];
+	RuneTypes_t runes[MAXPLAYERS + 1];
+	int team[MAXPLAYERS + 1];
+	float center[MAXPLAYERS + 1][3];
+
+	for (int client = 1; client <= MaxClients; client++) {
+		alive[client] = IsClientInGame(client) && IsPlayerAlive(client);
+
+		// Dead players keep their team, so a spectator still filters by it
+		team[client] = IsClientInGame(client) ? GetClientTeam(client) : 0;
+		runes[client] = RUNE_NONE;
+		charged_supernova[client] = false;
+		stealth_checked[client] = false;
+
+		if (!alive[client]) continue;
+
+		runes[client] = GetCarryingRuneType(client);
+		if (runes[client] != RUNE_NONE) {
+			int max_health = TF2Util_GetEntityMaxHealth(client);
+			low_health_rune_carrier[client] = max_health > 0 && (float(GetClientHealth(client)) / float(max_health)) <= GLOW_LOW_HEALTH_RATIO;
+		}
+		charged_supernova[client] = runes[client] == RUNE_SUPERNOVA &&
+			GetEntPropFloat(client, Prop_Send, "m_flRuneCharge") >= 100.0;
+
+		// CBaseEntity::WorldSpaceCenter, used by the client for the distance check
+		float mins[3], maxs[3];
+		GetClientAbsOrigin(client, center[client]);
+		GetClientMins(client, mins);
+		GetClientMaxs(client, maxs);
+
+		for (int axis = 0; axis < 3; axis++) {
+			center[client][axis] += (mins[axis] + maxs[axis]) * 0.5;
+		}
+	}
+
+	for (int carrier = 1; carrier <= MaxClients; carrier++) {
+		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++) {
+			for (int observer = 1; observer <= MaxClients; observer++) {
+				player_glows[carrier][group].desired_recipients[observer] = false;
+			}
+		}
+	}
+
+	for (int observer = 1; observer <= MaxClients; observer++) {
+		if (
+			!IsClientInGame(observer) ||
+			IsFakeClient(observer) ||
+			IsClientReplay(observer) ||
+			IsClientSourceTV(observer)
+		) {
+			continue;
+		}
+
+		// Dead players and spectators use their spectated player's position.
+		int viewer = observer;
+		if (!alive[observer]) {
+			viewer = GetEntPropEnt(observer, Prop_Send, "m_hObserverTarget");
+			if (viewer < 1 || viewer > MaxClients || viewer == observer || !alive[viewer])
+				continue;
+		}
+
+		RuneTypes_t rune = runes[observer];
+
+		for (int target = 1; target <= MaxClients; target++) {
+			if (!alive[target] || target == observer || team[target] == team[observer])
+				continue;
+
+			bool team_glow = rune == RUNE_NONE && low_health_rune_carrier[target];
+			bool supernova_glow = false;
+
+			// A charged Supernova reveals every nearby enemy that is not stealthed
+			// (TF_COND_STEALTHED, TF_COND_STEALTHED_USER_BUFF, TF_COND_STEALTHED_USER_BUFF_FADING)
+			if (
+				charged_supernova[observer] &&
+				GetVectorDistance(center[viewer], center[target], true) <= GLOW_SUPERNOVA_RADIUS_SQR
+			) {
+				if (!stealth_checked[target]) {
+					stealthed[target] =
+						TF2_IsPlayerInCondition(target, TFCond_Cloaked) ||
+						TF2_IsPlayerInCondition(target, TFCond_Stealthed) ||
+						TF2_IsPlayerInCondition(target, TFCond_StealthedUserBuffFade);
+					stealth_checked[target] = true;
+				}
+				supernova_glow = !stealthed[target];
+			}
+
+			if ((team_glow || supernova_glow) && IsGlowLineOfSightClear(viewer, target)) {
+				if (team_glow)
+					player_glows[target][GLOW_GROUP_TEAM].desired_recipients[observer] = true;
+				if (supernova_glow)
+					player_glows[target][GLOW_GROUP_SUPERNOVA].desired_recipients[observer] = true;
+			}
+		}
+	}
+
+	for (int carrier = 1; carrier <= MaxClients; carrier++) {
+		for (GlowGroup group = GLOW_GROUP_TEAM; group < GLOW_GROUP_COUNT; group++)
+			SyncPlayerGlowGroup(carrier, group);
+	}
 }
 
 stock bool StrStartsWith(const char[] str, const char[] prefix) {
