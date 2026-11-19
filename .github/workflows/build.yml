@@ -15,25 +15,19 @@ permissions:
   contents: read
 
 env:
-  PLUGIN: powerupreverts
+  SM_VERSION: "1.12"
 
 jobs:
   build:
-    name: Build (SourceMod ${{ matrix.sm-target }})
+    name: Build
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        # 1.12 is the oldest supported SourceMod and the build that gets released.
-        # 1.13 is a forward-compatibility check: newer includes and compiler.
-        sm-target: ["1.12", "1.13"]
 
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup SourceMod
         run: |
-          wget -q -O sourcemod.tar.gz "https://www.sourcemod.net/latest.php?os=linux&version=${{ matrix.sm-target }}"
+          wget -q -O sourcemod.tar.gz "https://www.sourcemod.net/latest.php?os=linux&version=$SM_VERSION"
           mkdir sourcemod
           tar xf sourcemod.tar.gz -C sourcemod
           cd sourcemod/addons/sourcemod/scripting
@@ -46,19 +40,19 @@ jobs:
       - name: Stamp version
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          sed -i "s/^#define PLUGIN_VERSION \".*\"/#define PLUGIN_VERSION \"${GITHUB_REF_NAME#v}\"/" scripting/$PLUGIN.sp
-          grep '^#define PLUGIN_VERSION' scripting/$PLUGIN.sp
+          sed -i "s/^#define PLUGIN_VERSION \".*\"/#define PLUGIN_VERSION \"${GITHUB_REF_NAME#v}\"/" scripting/powerupreverts.sp
+          grep '^#define PLUGIN_VERSION' scripting/powerupreverts.sp
 
       - name: Compile
         run: |
           mkdir -p dist/addons/sourcemod/plugins dist/addons/sourcemod/gamedata
-          ./scripting/spcomp64 -i scripting/include -o dist/addons/sourcemod/plugins/$PLUGIN.smx scripting/$PLUGIN.sp
-          cp gamedata/$PLUGIN.txt dist/addons/sourcemod/gamedata/
+          ./scripting/spcomp64 -i scripting/include -o dist/addons/sourcemod/plugins/powerupreverts.smx scripting/powerupreverts.sp
+          cp gamedata/powerupreverts.txt dist/addons/sourcemod/gamedata/
 
       - name: Upload build
         uses: actions/upload-artifact@v4
         with:
-          name: $PLUGIN-sm${{ matrix.sm-target }}
+          name: powerupreverts
           path: dist/
           if-no-files-found: error
 
@@ -74,17 +68,17 @@ jobs:
       - name: Download build
         uses: actions/download-artifact@v4
         with:
-          name: $PLUGIN-sm1.12
+          name: powerupreverts
           path: dist
 
       - name: Package
         run: |
           cd dist
-          zip -qr "../$PLUGIN-${GITHUB_REF_NAME}.zip" addons
-          unzip -l "../$PLUGIN-${GITHUB_REF_NAME}.zip"
+          zip -qr ../powerupreverts.zip addons
+          unzip -l ../powerupreverts.zip
 
       - name: Publish
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ env.PLUGIN }}-${{ github.ref_name }}.zip
+          files: powerupreverts.zip
           generate_release_notes: true
