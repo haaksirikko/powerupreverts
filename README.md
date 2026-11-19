@@ -9,9 +9,16 @@ Subsequent changes to Mannpower have almost always been nerfs to mechanics in th
 Dependencies:
 
 - 32-bit server
+- SourceMod 1.12 or newer
 - [TF2Attributes](https://github.com/FlaminSarge/tf2attributes)
 - [TF2Utils](https://github.com/nosoop/SM-TFUtils)
 - [Source Scramble](https://github.com/nosoop/SMExt-SourceScramble)
+
+Installation:
+
+Copy `powerupreverts.smx` to `addons/sourcemod/plugins/` and `powerupreverts.txt` to
+`addons/sourcemod/gamedata/`. Release archives ship both files in that layout, so they can be
+extracted straight into the server's `tf/` directory.
 
 ConVars:
 - `sm_powerupreverts_enable` - Enable or disable the plugin. (default: 1)

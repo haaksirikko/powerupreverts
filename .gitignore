@@ -10,9 +10,14 @@ scripting/*
 #includes
 !scripting/include/
 scripting/include/*
+!scripting/include/sourcescramble.inc
 !scripting/include/tf2attributes.inc
 !scripting/include/tf2utils.inc
-!scripting/include/sourcescramble.inc
+
+#ci
+!.github/
+!.github/workflows/
+!.github/workflows/build.yml
 
 !gamedata/
 gamedata/*
