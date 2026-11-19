@@ -18,6 +18,7 @@ scripting/include/*
 !.github/
 !.github/workflows/
 !.github/workflows/build.yml
+!.github/workflows/release.yml
 
 !gamedata/
 gamedata/*

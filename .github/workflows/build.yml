@@ -1,11 +1,13 @@
-name: Build
+name: build
 
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   pull_request:
   workflow_dispatch:
+  # release.yml calls this workflow on tags so the artifact always comes from
+  # the same build that gets published.
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -19,15 +21,23 @@ env:
 
 jobs:
   build:
-    name: Build
+    name: Build (SM ${{ matrix.sm-target }})
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        # 1.12 is the only supported target. The matrix is kept as-is so a
+        # 1.13 leg can be re-added without touching anything else.
+        sm-target: ["1.12"]
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v7
 
       - name: Setup SourceMod
         run: |
-          wget -q -O sourcemod.tar.gz "https://www.sourcemod.net/latest.php?os=linux&version=$SM_VERSION"
+          wget -O sourcemod.tar.gz "https://www.sourcemod.net/latest.php?os=linux&version=${{ matrix.sm-target }}"
           mkdir sourcemod
           tar xf sourcemod.tar.gz -C sourcemod
           cd sourcemod/addons/sourcemod/scripting
@@ -43,42 +53,18 @@ jobs:
           sed -i "s/^#define PLUGIN_VERSION \".*\"/#define PLUGIN_VERSION \"${GITHUB_REF_NAME#v}\"/" scripting/powerupreverts.sp
           grep '^#define PLUGIN_VERSION' scripting/powerupreverts.sp
 
-      - name: Compile
+      - name: Build plugin
         run: |
           mkdir -p dist/addons/sourcemod/plugins dist/addons/sourcemod/gamedata
           ./scripting/spcomp64 -i scripting/include -o dist/addons/sourcemod/plugins/powerupreverts.smx scripting/powerupreverts.sp
           cp gamedata/powerupreverts.txt dist/addons/sourcemod/gamedata/
 
-      - name: Upload build
-        uses: actions/upload-artifact@v4
+      # GitHub appends .zip to the artifact name, so this downloads as
+      # powerupreverts.zip with addons/ at its root.
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
         with:
           name: powerupreverts
           path: dist/
+          retention-days: 90
           if-no-files-found: error
-
-  release:
-    name: Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download build
-        uses: actions/download-artifact@v4
-        with:
-          name: powerupreverts
-          path: dist
-
-      - name: Package
-        run: |
-          cd dist
-          zip -qr ../powerupreverts.zip addons
-          unzip -l ../powerupreverts.zip
-
-      - name: Publish
-        uses: softprops/action-gh-release@v2
-        with:
-          files: powerupreverts.zip
-          generate_release_notes: true

@@ -1,0 +1,39 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  create-release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # The artifact holds the unpacked addons/ tree; rebuild the release zip so
+      # users can extract it straight into tf/.
+      - name: Package
+        run: |
+          cd artifacts
+          zip -qr powerupreverts.zip addons
+          unzip -l powerupreverts.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: artifacts/*.zip
+          generate_release_notes: true
