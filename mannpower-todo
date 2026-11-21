@@ -90,6 +90,9 @@ glow notes:
     transmission would leave its client-side glow attached to the still-visible carrier
 - a creation failure sticks at -1 so it is not retried (and logged) every refresh; it is cleared
     once the carrier stops qualifying
+- eligibility state lives in a global `conditions` struct that is reset every refresh; the fields
+    only assigned conditionally (low_health_rune_carrier, stealthed) must be cleared up front.
+    leaving one set makes a carrier glow team colour forever after healing up or dropping the rune
 - tf_glow normally uses FL_EDICT_ALWAYS, which bypasses SDKHook_SetTransmit; our glows use
     full transmit checks and override UpdateTransmitState so the recipient filter runs
 - the stolen flag glow is only transmitted to the team the flag belongs to, because that is the
