@@ -28,6 +28,10 @@
 // Low health carriers reveal themselves below this health ratio
 #define GLOW_LOW_HEALTH_RATIO 0.3
 
+// A recipient that loses line of sight is kept for this many refreshes (~0.6 s at
+// 66 tick) so that moving behind cover does not rebuild the glow entity every refresh
+#define GLOW_RECIPIENT_MISSES 4
+
 // Glow groups categorize different types of glow effects, which may have distinct propagation rules and visibility conditions.
 enum GlowGroup {
 	GLOW_GROUP_TEAM,
@@ -137,6 +141,7 @@ enum struct SharedGlow {
 	int color;
 	bool observers[MAXPLAYERS + 1];
 	bool desired_observers[MAXPLAYERS + 1];
+	char misses[MAXPLAYERS + 1];	// consecutive refreshes without line of sight
 }
 SharedGlow player_glows[MAXPLAYERS + 1][GLOW_GROUP_COUNT];
 
@@ -308,13 +313,23 @@ public void OnEntityDestroyed(int entity) {
 
 	// A destroyed glow must not leave stale routing metadata on a reused slot.
 	int target = glow_entities[entity].target;
+	GlowRoute route = glow_entities[entity].route;
 	GlowGroup group = glow_entities[entity].group;
 	if (
+		route == GLOW_ROUTE_SHARED_PLAYER &&
 		target >= 1 && target <= MaxClients &&
 		group >= GLOW_GROUP_TEAM && group < GLOW_GROUP_COUNT &&
 		player_glows[target][group].glow == entity
 	) {
 		ResetPlayerGlow(target, group);
+	}
+	else if (
+		route == GLOW_ROUTE_FLAG &&
+		target > MaxClients && target < MAX_ENTITIES &&
+		flag_glows[target].glow == entity
+	) {
+		// Otherwise the flag keeps the recycled index and never recreates its glow
+		ResetFlagGlow(target);
 	}
 	glow_entities[entity].target = -1;
 	glow_entities[entity].route = GLOW_ROUTE_FLAG;
@@ -1003,6 +1018,7 @@ void ResetPlayerGlow(int target, GlowGroup group) {
 	for (int observer = 0; observer <= MaxClients; observer++) {
 		player_glows[target][group].observers[observer] = false;
 		player_glows[target][group].desired_observers[observer] = false;
+		player_glows[target][group].misses[observer] = 0;
 	}
 }
 
@@ -1077,15 +1093,15 @@ int SpawnGlowEntity(int target, const int color[4], GlowRoute route, GlowGroup g
 	// CTFGlow removes itself when its target cannot be found
 	if (!IsValidEntity(glow) || GetEntPropEnt(glow, Prop_Send, "m_hTarget") != target) {
 		LogError("tf_glow failed to target entity %d", target);
+		if (IsValidEntity(glow))
+			RemoveEntity(glow);
 		return -1;
 	}
 
 	// Entity slots are reused, so routing metadata is rewritten on every creation.
 	glow_entities[glow].route = route;
-	if (route == GLOW_ROUTE_SHARED_PLAYER) {
-		glow_entities[glow].target = target;
-		glow_entities[glow].group = group;
-	}
+	glow_entities[glow].target = target;
+	glow_entities[glow].group = group;
 
 	if (
 		dhook_CTFGlow_UpdateTransmitState.HookEntity(Hook_Pre, glow, DHookCallback_GlowUpdateTransmitState) == INVALID_HOOK_ID ||
@@ -1177,6 +1193,11 @@ void SyncFlagGlow(int flag) {
 		GetEntProp(flag, Prop_Send, "m_bGlowEnabled") == 0
 	) {
 		SetFlagGlowEnabled(flag, false);
+
+		// A failed creation is retried the next time the flag is stolen instead of
+		// every refresh, which would flood the log
+		if (flag_glows[flag].glow < 0)
+			ResetFlagGlow(flag);
 		return;
 	}
 
@@ -1267,6 +1288,18 @@ void SyncPlayerGlowGroup(int target, GlowGroup group) {
 	bool recipients_changed = false;
 	for (int observer = 1; observer <= MaxClients; observer++) {
 		bool desired = player_glows[target][group].desired_observers[observer];
+		if (desired) {
+			player_glows[target][group].misses[observer] = 0;
+		}
+		else if (
+			player_glows[target][group].observers[observer] &&
+			++player_glows[target][group].misses[observer] < GLOW_RECIPIENT_MISSES
+		) {
+			// Keep a briefly ineligible recipient so a carrier walking behind cover
+			// does not destroy and recreate the glow entity on every refresh
+			player_glows[target][group].desired_observers[observer] = true;
+			desired = true;
+		}
 		has_recipients = has_recipients || desired;
 		if (player_glows[target][group].observers[observer] != desired)
 			recipients_changed = true;
@@ -1398,10 +1431,17 @@ void UpdatePowerupGlows() {
 				continue;
 		}
 
+		// A plain spectator has no game team, so it filters by the spectated
+		// player's team instead of seeing both teams' carriers. Dead players keep
+		// their own team.
+		int observer_team = conditions[observer].team;
+		if (observer_team < view_as<int>(TFTeam_Red) || observer_team > view_as<int>(TFTeam_Blue))
+			observer_team = conditions[viewer].team;
+
 		RuneTypes_t rune = conditions[observer].rune;
 
 		for (int target = 1; target <= MaxClients; target++) {
-			if (!conditions[target].alive || target == observer || conditions[target].team == conditions[observer].team)
+			if (!conditions[target].alive || target == observer || conditions[target].team == observer_team)
 				continue;
 
 			bool team_glow = rune == RUNE_NONE && conditions[target].low_health_rune_carrier;
