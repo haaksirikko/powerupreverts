@@ -3,24 +3,24 @@ todo list (incomplete)
 where IsPowerupMode is called (server/shared):
 
 temp rune spawn (implemented)
-capture zone (implemented?)
+capture zone (implemented: CCaptureZone::Capture and CCaptureFlag::Capture run with the prop set)
 buildings
 - increased damage taken from strength, revenge, knockout (implemented)
 - vampire leech (implemented)
 - 1 sec total construction time (implemented)
 - Level3 skips Level2 anim when redeployed (implemented)
 - double upgrade rate (implemented)
-sapper vampire leech (implemented?)
+sapper vampire leech (implemented: CObjectSapper::SapperThink runs with the prop set)
 player
 - uber on spawn (implemented)
-- dropping powerup on disconnect (implemented?)
+- dropping powerup on disconnect (implemented: OnClientDisconnect restores the prop so CTFPlayer::TeamFortress_ClientDisconnected drops the rune)
 - rune regen think (implemented)
 - no dominant state (implemented)
 - undo rage build reductions (implemented)
 - powerup carrier glow (implemented: shared tf_glow per carrier/color group, sm_powerupreverts_powerup_glow)
 capture flag (elaborate)
 - flag glow (implemented: tf_glow while stolen, engine glow suppressed meanwhile)
-- standoff (works?)
+- standoff (implemented: CCaptureFlag::Drop runs with the prop set, so PowerupModeFlagStandoffActive() drops the return timer to 0)
 - flag marked poisonous (implemented)
 - custom capture sound (implemented)
 - mark for death on poisonous flag (implemented)
@@ -29,16 +29,16 @@ gamerules (elaborate)
 - no dominations and revenge (implemented)
 - prevent imbalance team swap (implemented)
 - no dominant state (implemented)
-- CanFlagBeCaptured (indirectly implemented?)
-- standoff active (indirecly implemented?)
-- CalcPlayerScore 5 points per intel cap
+- CanFlagBeCaptured (implemented: called from CCaptureZone::Capture, which runs with the prop set)
+- standoff active (implemented: same prop set as CCaptureFlag::Drop)
+- CalcPlayerScore 5 points per intel cap (todo: CalcPlayerScore is static, so it needs a signature detour, not a gamerules vtable hook)
 - scout no fall damage (implemented)
 - precision no radius damage falloff (implemented)
 player shared
 - burn damage vampire leech (implemented)
 weapons
 - knife
- - kunai delta health (?)
+ - kunai delta health (implemented for rune carriers in mode 1: CTFKnife::PrimaryAttack is reached through the knife PrimaryAttack hook)
 - sniperrifle
  - precision damage bonus (implemented)
 - weaponbase
@@ -68,7 +68,7 @@ weapons
 removed features to re-implement:
 heavy grapple jump (implemented)
 medic free ride (implemented)
-medic overheal on powerup (implemented?)
+medic overheal on powerup (implemented: CWeaponMedigun::GetOverHealBonus detour returns the full overheal bonus)
 
 glow notes:
 - both glows are driven by m_bPowerupMode on the client (flag: CCaptureFlag::ShouldHideGlowEffect,
@@ -106,7 +106,7 @@ glow notes:
 additional nerfs to revert:
 demo nerfs of march 2016
 grapple speed nerfs
-strength increases crit damage (done)
+strength increases crit damage (implemented: 2.0x, 1.4x while dominant, in OnTakeDamage)
 
 tf2 patch notes
 
