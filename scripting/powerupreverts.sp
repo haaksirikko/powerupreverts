@@ -28,9 +28,10 @@
 // Low health carriers reveal themselves below this health ratio
 #define GLOW_LOW_HEALTH_RATIO 0.3
 
-// A recipient that loses line of sight is kept for this many refreshes (~0.6 s at
-// 66 tick) so that moving behind cover does not rebuild the glow entity every refresh
-#define GLOW_RECIPIENT_MISSES 4
+// A glow with no eligible recipients is disabled at once but kept for this many
+// refreshes (~0.6 s at 66 tick) before removal, so a carrier stepping behind cover
+// does not rebuild the glow entity every refresh
+#define GLOW_CULL_GRACE_REFRESHES 4
 
 // Glow groups categorize different types of glow effects, which may have distinct propagation rules and visibility conditions.
 enum GlowGroup {
@@ -141,7 +142,7 @@ enum struct SharedGlow {
 	int color;
 	bool observers[MAXPLAYERS + 1];
 	bool desired_observers[MAXPLAYERS + 1];
-	char misses[MAXPLAYERS + 1];	// consecutive refreshes without line of sight
+	char idle;	// consecutive refreshes without an eligible recipient
 }
 SharedGlow player_glows[MAXPLAYERS + 1][GLOW_GROUP_COUNT];
 
@@ -1018,8 +1019,8 @@ void ResetPlayerGlow(int target, GlowGroup group) {
 	for (int observer = 0; observer <= MaxClients; observer++) {
 		player_glows[target][group].observers[observer] = false;
 		player_glows[target][group].desired_observers[observer] = false;
-		player_glows[target][group].misses[observer] = 0;
 	}
+	player_glows[target][group].idle = 0;
 }
 
 void DestroyPlayerGlow(int target, GlowGroup group) {
@@ -1288,18 +1289,6 @@ void SyncPlayerGlowGroup(int target, GlowGroup group) {
 	bool recipients_changed = false;
 	for (int observer = 1; observer <= MaxClients; observer++) {
 		bool desired = player_glows[target][group].desired_observers[observer];
-		if (desired) {
-			player_glows[target][group].misses[observer] = 0;
-		}
-		else if (
-			player_glows[target][group].observers[observer] &&
-			++player_glows[target][group].misses[observer] < GLOW_RECIPIENT_MISSES
-		) {
-			// Keep a briefly ineligible recipient so a carrier walking behind cover
-			// does not destroy and recreate the glow entity on every refresh
-			player_glows[target][group].desired_observers[observer] = true;
-			desired = true;
-		}
 		has_recipients = has_recipients || desired;
 		if (player_glows[target][group].observers[observer] != desired)
 			recipients_changed = true;
@@ -1307,10 +1296,24 @@ void SyncPlayerGlowGroup(int target, GlowGroup group) {
 
 	int glow = player_glows[target][group].glow;
 	if (!has_recipients) {
+		// Hide the glow as soon as the last recipient loses line of sight, but keep
+		// the entity for a few refreshes: the old recipients keep receiving it,
+		// which is what makes the disable reach their client, and enabling it again
+		// is cheaper than a new creation
+		if (glow > 0 && IsValidEntity(glow)) {
+			if (player_glows[target][group].idle == 0)
+				AcceptEntityInput(glow, "Disable");
+
+			if (++player_glows[target][group].idle < GLOW_CULL_GRACE_REFRESHES)
+				return;
+		}
+
 		if (glow != 0)
 			DestroyPlayerGlow(target, group);
 		return;
 	}
+
+	player_glows[target][group].idle = 0;
 
 	// A failed creation must not be retried every refresh, or it floods the log
 	if (glow < 0)
@@ -1352,6 +1355,9 @@ void SyncPlayerGlowGroup(int target, GlowGroup group) {
 		SetVariantColor(color);
 		AcceptEntityInput(glow, "SetGlowColor");
 	}
+
+	// No-op unless the glow was disabled while culled
+	AcceptEntityInput(glow, "Enable");
 }
 
 enum struct client_condition {

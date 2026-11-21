@@ -88,9 +88,12 @@ glow notes:
 - each carrier uses at most two player-glow entities: one team/health color shared by eligible
     observers without a rune, and one yellow glow shared by eligible charged-Supernova observers
 - a shared glow is destroyed and recreated when its recipient set changes; merely stopping
-    transmission would leave its client-side glow attached to the still-visible carrier. a recipient
-    that just lost line of sight is kept for GLOW_RECIPIENT_MISSES refreshes first, so a carrier
-    stepping behind cover does not rebuild the entity (and its hooks) every refresh
+    transmission would leave its client-side glow attached to the still-visible carrier
+- when the last recipient loses line of sight the glow is disabled at once, because the disable is
+    what makes the client drop its glow object (C_TFGlow::PostDataUpdate); the entity is kept for
+    GLOW_CULL_GRACE_REFRESHES and still transmitted to the old recipients, then removed. without
+    that, a carrier stepping behind cover would rebuild the entity and its hooks every refresh,
+    and keeping the entity enabled would draw it through the wall until it was removed
 - a creation failure sticks at -1 so it is not retried (and logged) every refresh; it is cleared
     once the carrier stops qualifying. the flag glow has no "stops qualifying" moment while it is
     still stolen, so it is retried the next time the flag is stolen instead
