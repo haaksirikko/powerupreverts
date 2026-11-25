@@ -110,20 +110,22 @@
 				"linux"		"271"
 				"windows"	"233"
 			}
+			// CTFGameRules::GetNetPropDataMap (linux 41, windows 40) was added in the
+			// Nov 2026 update, shifting every later CTFGameRules slot by one
 			"CTFGameRules::FlPlayerFallDamage"
 			{
-				"linux"		"63"
-				"windows"	"62"
+				"linux"		"64"
+				"windows"	"63"
 			}
 			"CTFGameRules::SetupOnRoundStart"
 			{
-				"linux"		"194"
-				"windows"	"192"
+				"linux"		"195"
+				"windows"	"193"
 			}
 			"CTFGameRules::SetupOnRoundRunning"
 			{
-				"linux"		"195"
-				"windows"	"193"
+				"linux"		"196"
+				"windows"	"194"
 			}
 			"CTFWeaponBase::PrimaryAttack"
 			{
@@ -177,9 +179,9 @@
 				"signature"		"CTFGameMovement::CheckJumpButton"
 				"linux"
 				{
-					"offset"	"92"
-					"verify"	"\x83\xBF\xD8\x22\x00\x00\x06" // cmp dword [edi+0x22D8], 0x6
-					"patch"		"\x83\xBF\xD8\x22\x00\x00\xFF" // cmp dword [edi+0x22D8], 0xFF (never == Heavy)
+					"offset"	"101"
+					"verify"	"\x83\xB9\xD8\x22\x00\x00\x06" // cmp dword [ecx+0x22D8], 0x6
+					"patch"		"\x83\xB9\xD8\x22\x00\x00\xFF" // cmp dword [ecx+0x22D8], 0xFF (never == Heavy)
 				}
 				"windows"
 				{
